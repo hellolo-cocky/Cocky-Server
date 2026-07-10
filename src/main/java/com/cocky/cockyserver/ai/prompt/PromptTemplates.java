@@ -1,6 +1,7 @@
 package com.cocky.cockyserver.ai.prompt;
 
 import com.cocky.cockyserver.ai.dto.Difficulty;
+import com.cocky.cockyserver.ai.dto.ExampleIo;
 import com.cocky.cockyserver.ai.dto.GenerationRequest;
 import com.cocky.cockyserver.ai.dto.Language;
 import com.cocky.cockyserver.ai.dto.Period;
@@ -34,6 +35,8 @@ public final class PromptTemplates {
             지문이 해 존재를 보장하는 문제라면 answerCode에 '해 없음' 경로(-1 반환 등)를
             넣지 말 것. 출력 전에 각 예제 input으로 answerCode 실행을 단계별로 추적해
             output과 일치하는지 확인할 것. 경계값(포함/미포함)을 지문 기준으로 재확인할 것.
+            부분집합·조합 탐색처럼 복수 해가 가능한 구조라면 사전순 최소 해 출력 같은
+            유일 선택 규칙을 지문에 포함할 것.
             """;
 
     public static String generationUser(GenerationRequest req, Language lang, Difficulty diff) {
@@ -60,6 +63,35 @@ public final class PromptTemplates {
                 직전 시도 실패 사유: %s
                 위 실패 원인을 교정한 새 문제를 생성하라.
                 """.formatted(lastFailure);
+    }
+
+    public static final String REPAIR_SYSTEM = """
+            너는 알고리즘 문제의 정답 코드를 수리하는 개발자다. 문제 지문과 예제는
+            절대 바꾸지 않는다. 반드시 아래 JSON 스키마만 출력한다.
+            { "answerCode": string }
+            수리한 코드는 표준입력을 읽어 표준출력으로 답을 내며, 모든 예제 input에
+            대해 output과 정확히 일치하는 결과를 내야 한다.
+            """;
+
+    /** 검증 실패한 answerCode의 수리 요청 — 지문·예제 고정, 코드만 교정. */
+    public static String repairUser(Language lang, String statement, List<ExampleIo> examples,
+                                    String answerCode, String failReason) {
+        StringBuilder exText = new StringBuilder();
+        for (ExampleIo ex : examples) {
+            exText.append("input:\n").append(ex.input())
+                    .append("\noutput:\n").append(ex.output()).append('\n');
+        }
+        return """
+                언어: %s
+                문제 지문:
+                %s
+                예제(전부 통과 필수):
+                %s
+                현재 정답 코드(검증 실패):
+                %s
+                검증 실패 사유: %s
+                지문·예제는 그대로 두고 answerCode만 수정해 JSON으로 응답.
+                """.formatted(lang, statement, exText, answerCode, failReason);
     }
 
     public static final String DIFFICULTY_SYSTEM = """

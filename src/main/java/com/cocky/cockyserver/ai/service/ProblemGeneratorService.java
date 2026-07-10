@@ -68,6 +68,7 @@ public class ProblemGeneratorService implements ProblemGenerator {
                                        List<String> seenStatements) {
         int maxRetries = props.generation().maxRetries();
         String lastReason = "알 수 없음";
+        Parsed lastFailed = null;
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 // 재시도면 직전 실패 사유를 프롬프트에 붙여 같은 실수 재생산을 막는다.
@@ -80,15 +81,25 @@ public class ProblemGeneratorService implements ProblemGenerator {
                 if (similarity.isDuplicate(parsed.statement, seenStatements,
                         props.generation().similarityThreshold())) {
                     lastReason = "기존 문제와 유사도 초과";
+                    lastFailed = parsed;
                     log.info("[{}/{}] 재생성 — {} (시도 {})", lang, diff, lastReason, attempt);
                     continue;
                 }
 
                 VerifyOutcome verified = verifyExamples(lang, parsed);
                 if (!verified.ok()) {
-                    lastReason = verified.reason();
-                    log.info("[{}/{}] 재생성 — {} (시도 {})", lang, diff, lastReason, attempt);
-                    continue;
+                    // 백지 재생성 전에 1회 수리: 지문·예제 고정, answerCode만 교정.
+                    Parsed repaired = tryRepair(lang, parsed, verified.reason());
+                    VerifyOutcome reverified = repaired == null ? null : verifyExamples(lang, repaired);
+                    if (reverified == null || !reverified.ok()) {
+                        lastReason = reverified != null ? reverified.reason() : verified.reason();
+                        lastFailed = parsed;
+                        log.info("[{}/{}] 재생성 — 수리 불발, {} (시도 {})", lang, diff, lastReason, attempt);
+                        continue;
+                    }
+                    log.info("[{}/{}] 정답 코드 수리로 통과 (시도 {})", lang, diff, attempt);
+                    parsed = repaired;
+                    verified = reverified;
                 }
 
                 recheckDifficulty(diff, parsed.statement);
@@ -102,6 +113,11 @@ public class ProblemGeneratorService implements ProblemGenerator {
         }
         log.error("[{}/{}] 재시도 {}회 소진 — 실패 조합으로 보고(성공분 보존): {}",
                 lang, diff, maxRetries, lastReason);
+        if (lastFailed != null) {
+            // 사후 분석용 — 실패 문제의 지문이 없으면 불일치 원인 역추정이 안 된다.
+            log.error("[{}/{}] 마지막 실패 문제: 제목=[{}] 지문=[{}]",
+                    lang, diff, lastFailed.title, abbreviate(lastFailed.statement, 400));
+        }
         return GenerationItem.failure(lang, diff, maxRetries, lastReason);
     }
 
@@ -158,13 +174,38 @@ public class ProblemGeneratorService implements ProblemGenerator {
         return escaped.length() <= 120 ? escaped : escaped.substring(0, 117) + "...";
     }
 
+    /**
+     * 검증 실패한 answerCode를 지문·예제 고정 상태로 1회 수리 시도.
+     * 실패(호출 오류·빈 코드)면 null — 호출부가 백지 재생성으로 폴백한다.
+     */
+    private Parsed tryRepair(Language lang, Parsed parsed, String failReason) {
+        try {
+            String json = openAi.chatJson(props.models().generation(),
+                    PromptTemplates.REPAIR_SYSTEM,
+                    PromptTemplates.repairUser(lang, parsed.statement, parsed.examples,
+                            parsed.answerCode, failReason));
+            String code = mapper.readTree(json).path("answerCode").asText("");
+            if (code.isBlank()) {
+                return null;
+            }
+            return new Parsed(parsed.title, parsed.statement, code, parsed.examples);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException | RuntimeException e) {
+            log.debug("정답 코드 수리 호출 실패: {}", e.getMessage());
+            return null;
+        }
+    }
+
     /** 컴파일/실행 오류 로그용 축약: 개행 제거 후 120자 제한. */
     private static String abbreviate(String s) {
+        return abbreviate(s, 120);
+    }
+
+    private static String abbreviate(String s, int max) {
         if (s == null) {
             return "";
         }
         String oneLine = s.strip().replaceAll("\\s*\\R\\s*", " ⏎ ");
-        return oneLine.length() <= 120 ? oneLine : oneLine.substring(0, 117) + "...";
+        return oneLine.length() <= max ? oneLine : oneLine.substring(0, max - 3) + "...";
     }
 
     private void recheckDifficulty(Difficulty requested, String statement) {
