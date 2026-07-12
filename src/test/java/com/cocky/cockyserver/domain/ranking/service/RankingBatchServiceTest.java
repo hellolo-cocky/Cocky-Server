@@ -33,6 +33,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -135,7 +136,7 @@ class RankingBatchServiceTest {
         assertEquals(4, result.generatedCount());
 
         ArgumentCaptor<List<RankingSnapshot>> captor = ArgumentCaptor.forClass(List.class);
-        verify(rankingSnapshotRepository).saveAll(captor.capture());
+        verify(rankingSnapshotRepository).saveAllAndFlush(captor.capture());
         List<RankingSnapshot> saved = captor.getValue();
 
         assertEquals(1, saved.get(0).getRank());
@@ -163,6 +164,51 @@ class RankingBatchServiceTest {
 
         assertTrue(!result.skipped());
         assertEquals(0, result.generatedCount());
-        verify(rankingSnapshotRepository, never()).saveAll(any());
+        verify(rankingSnapshotRepository, never()).saveAllAndFlush(any());
+    }
+
+    @Test
+    void concurrentSaveViolatesUniqueConstraint_convertsToAlreadyGeneratedSkip() {
+        // exists 체크는 통과했지만(경쟁상태로 다른 스레드가 먼저 커밋) 실제 저장 시점에
+        // V10 유니크 제약(period_type, scope_type, round_id, user_id)에 걸리는 시나리오.
+        when(roundRepository.findTopByCloseAtLessThanEqualOrderByCloseAtDesc(NOW))
+                .thenReturn(Optional.of(closedRound()));
+        when(rankingSnapshotRepository.existsByPeriodTypeAndScopeTypeAndRoundId(
+                PeriodType.TWO_DAY, ScopeType.SCHOOL, CLOSED_ROUND_ID))
+                .thenReturn(false);
+        List<UserScoreAggregate> aggregates = List.of(aggregate(1L, "100.00"));
+        when(submissionRepository.aggregateLatestScoreByUserForRound(CLOSED_ROUND_ID)).thenReturn(aggregates);
+        when(userRepository.findAllById(any())).thenReturn(List.of(user(1L, "유저1")));
+        when(rankingSnapshotRepository.saveAllAndFlush(any()))
+                .thenThrow(new DataIntegrityViolationException("uk_ranking_snapshot_period_scope_round_user"));
+
+        RankingSnapshotResult result = rankingBatchService.generateSnapshot();
+
+        assertTrue(result.skipped());
+        assertEquals("ALREADY_GENERATED", result.reason());
+        assertEquals(CLOSED_ROUND_ID, result.roundId());
+    }
+
+    @Test
+    void missingUser_excludedFromSnapshotWithoutFailingBatch() {
+        // 집계 시점과 유저 조회 시점 사이 탈퇴 등으로 userId=2가 사라진 경우.
+        when(roundRepository.findTopByCloseAtLessThanEqualOrderByCloseAtDesc(NOW))
+                .thenReturn(Optional.of(closedRound()));
+        when(rankingSnapshotRepository.existsByPeriodTypeAndScopeTypeAndRoundId(
+                PeriodType.TWO_DAY, ScopeType.SCHOOL, CLOSED_ROUND_ID))
+                .thenReturn(false);
+        List<UserScoreAggregate> aggregates = List.of(aggregate(1L, "100.00"), aggregate(2L, "80.00"));
+        when(submissionRepository.aggregateLatestScoreByUserForRound(CLOSED_ROUND_ID)).thenReturn(aggregates);
+        when(userRepository.findAllById(any())).thenReturn(List.of(user(1L, "유저1")));
+
+        RankingSnapshotResult result = rankingBatchService.generateSnapshot();
+
+        assertTrue(!result.skipped());
+        assertEquals(1, result.generatedCount());
+
+        ArgumentCaptor<List<RankingSnapshot>> captor = ArgumentCaptor.forClass(List.class);
+        verify(rankingSnapshotRepository).saveAllAndFlush(captor.capture());
+        assertEquals(1, captor.getValue().size());
+        assertEquals(1L, captor.getValue().get(0).getUser().getId());
     }
 }

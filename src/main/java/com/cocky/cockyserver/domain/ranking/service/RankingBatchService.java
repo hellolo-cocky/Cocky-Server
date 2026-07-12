@@ -20,6 +20,9 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +36,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class RankingBatchService {
+
+    private static final Logger log = LoggerFactory.getLogger(RankingBatchService.class);
 
     private static final PeriodType BATCH_PERIOD_TYPE = PeriodType.TWO_DAY;
     private static final ScopeType BATCH_SCOPE_TYPE = ScopeType.SCHOOL;
@@ -57,6 +62,9 @@ public class RankingBatchService {
                     BATCH_PERIOD_TYPE, BATCH_SCOPE_TYPE, closedRound.getId(), "ALREADY_GENERATED");
         }
 
+        // 주의: aggregates는 Repository 쿼리가 이미 (score DESC, userId ASC)로 정렬해서
+        // 반환한다고 가정하고 아래에서 순서대로 표준 경쟁 랭킹(1,2,2,4)을 매긴다.
+        // Repository 쿼리 수정 시 이 가정이 깨지지 않는지 반드시 확인할 것.
         List<UserScoreAggregate> aggregates =
                 submissionRepository.aggregateLatestScoreByUserForRound(closedRound.getId());
         if (aggregates.isEmpty()) {
@@ -80,11 +88,28 @@ public class RankingBatchService {
             previousScore = totalScore;
 
             User user = usersById.get(aggregate.getUserId());
+            if (user == null) {
+                // 집계 시점과 유저 조회 시점 사이 탈퇴 등으로 유저가 사라진 엣지케이스.
+                // 배치 전체를 실패시키지 않고 해당 유저만 스냅샷에서 제외한다.
+                log.warn("랭킹 배치: userId={} 를 찾을 수 없어 스냅샷에서 제외 (round={})",
+                        aggregate.getUserId(), closedRound.getId());
+                continue;
+            }
             snapshots.add(new RankingSnapshot(
                     user, closedRound, BATCH_PERIOD_TYPE, BATCH_SCOPE_TYPE, rank, totalScore, now));
         }
 
-        rankingSnapshotRepository.saveAll(snapshots);
+        try {
+            rankingSnapshotRepository.saveAllAndFlush(snapshots);
+        } catch (DataIntegrityViolationException e) {
+            // exists 체크와 실제 저장 사이의 race condition(스케줄러 중복 실행, admin 동시
+            // 트리거)에 대한 최종 방어선 — DB unique 제약(V10) 위반을 감지해 skip으로 흡수한다.
+            log.info("랭킹 배치: round={} 스냅샷 저장 중 유니크 제약 위반 — 동시 실행으로 이미 생성됨",
+                    closedRound.getId());
+            return RankingSnapshotResult.skipped(
+                    BATCH_PERIOD_TYPE, BATCH_SCOPE_TYPE, closedRound.getId(), "ALREADY_GENERATED");
+        }
+
         return RankingSnapshotResult.completed(
                 BATCH_PERIOD_TYPE, BATCH_SCOPE_TYPE, closedRound.getId(), now, snapshots.size());
     }
