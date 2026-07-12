@@ -1,6 +1,8 @@
 package com.cocky.cockyserver.domain.submission.repository;
 
 import com.cocky.cockyserver.domain.submission.entity.Submission;
+import java.math.BigDecimal;
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -17,4 +19,21 @@ public interface SubmissionRepository extends JpaRepository<Submission, Long> {
     @Query("update Submission s set s.latest = false "
             + "where s.user.id = :userId and s.problem.id = :problemId and s.latest = true")
     int markPreviousNotLatest(@Param("userId") Long userId, @Param("problemId") Long problemId);
+
+    /**
+     * 유저별 "해당 라운드 문제당 마지막 제출"(is_latest=true)의 score 합산. 랭킹 배치가
+     * 직전 마감 라운드(9문제) 점수만 집계할 때 사용한다 — 과거 재제출은 is_latest=false로
+     * 이미 걸러져 있으므로 별도 MAX(id) 서브쿼리가 필요 없다. 동점자 처리를 위해 점수
+     * 내림차순 정렬 시 유저 id 오름차순으로 tie-break한다.
+     */
+    @Query("select s.user.id as userId, sum(s.score) as totalScore "
+            + "from Submission s where s.latest = true and s.problem.round.id = :roundId "
+            + "group by s.user.id "
+            + "order by sum(s.score) desc, s.user.id asc")
+    List<UserScoreAggregate> aggregateLatestScoreByUserForRound(@Param("roundId") Long roundId);
+
+    interface UserScoreAggregate {
+        Long getUserId();
+        BigDecimal getTotalScore();
+    }
 }

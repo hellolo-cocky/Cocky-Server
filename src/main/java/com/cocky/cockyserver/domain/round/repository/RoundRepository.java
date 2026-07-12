@@ -14,4 +14,7 @@ public interface RoundRepository extends JpaRepository<Round, Long> {
     Optional<Round> findByRoundDate(LocalDate roundDate);
 
     Optional<Round> findTopByOrderByRoundDateDesc();
+
+    /** 랭킹 배치가 집계 대상으로 삼을 "가장 최근에 마감된" 라운드. */
+    Optional<Round> findTopByCloseAtLessThanEqualOrderByCloseAtDesc(LocalDateTime now);
 }

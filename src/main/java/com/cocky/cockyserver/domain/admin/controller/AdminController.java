@@ -1,5 +1,7 @@
 package com.cocky.cockyserver.domain.admin.controller;
 
+import com.cocky.cockyserver.domain.ranking.dto.RankingSnapshotResult;
+import com.cocky.cockyserver.domain.ranking.service.RankingBatchService;
 import com.cocky.cockyserver.domain.round.dto.RoundGenerationResult;
 import com.cocky.cockyserver.domain.round.service.RoundSchedulerService;
 import lombok.RequiredArgsConstructor;
@@ -15,9 +17,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminController {
 
     private final RoundSchedulerService roundSchedulerService;
+    private final RankingBatchService rankingBatchService;
 
     @PostMapping("/scheduler/round-generation")
     public ResponseEntity<RoundGenerationResult> triggerRoundGeneration() {
         return ResponseEntity.ok(roundSchedulerService.triggerRoundGeneration());
+    }
+
+    @PostMapping("/scheduler/ranking-snapshot")
+    public ResponseEntity<RankingSnapshotResult> triggerRankingSnapshot() {
+        return ResponseEntity.ok(rankingBatchService.generateSnapshot());
     }
 }
