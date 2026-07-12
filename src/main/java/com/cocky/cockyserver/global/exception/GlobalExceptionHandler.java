@@ -6,6 +6,8 @@ import com.cocky.cockyserver.domain.auth.exception.RefreshTokenExpiredException;
 import com.cocky.cockyserver.domain.auth.exception.RefreshTokenInvalidException;
 import com.cocky.cockyserver.domain.auth.exception.SignupNotAllowedException;
 import com.cocky.cockyserver.domain.problem.exception.ProblemNotFoundException;
+import com.cocky.cockyserver.domain.ranking.exception.RankingNotFoundException;
+import com.cocky.cockyserver.domain.ranking.exception.UnsupportedRankingCombinationException;
 import com.cocky.cockyserver.domain.round.exception.RoundNotFoundException;
 import com.cocky.cockyserver.domain.submission.exception.LanguageMismatchException;
 import com.cocky.cockyserver.domain.submission.exception.RoundClosedException;
@@ -97,5 +99,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleTestCaseNotConfigured(TestCaseNotConfiguredException e) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ErrorResponse("TEST_CASE_NOT_CONFIGURED", e.getMessage()));
+    }
+
+    @ExceptionHandler(RankingNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleRankingNotFound(RankingNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponse("RANKING_NOT_FOUND", e.getMessage()));
+    }
+
+    @ExceptionHandler(UnsupportedRankingCombinationException.class)
+    public ResponseEntity<ErrorResponse> handleUnsupportedRankingCombination(
+            UnsupportedRankingCombinationException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse("UNSUPPORTED_RANKING_COMBINATION", e.getMessage()));
     }
 }
