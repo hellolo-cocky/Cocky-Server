@@ -16,7 +16,7 @@ RUN ./gradlew dependencies --no-daemon
 COPY src ./src
 # 배포 이미지 빌드 시점에는 테스트를 돌리지 않는다 — 테스트는 CI에서 별도로 검증하고,
 # 여기서는 빌드 속도를 우선한다.
-RUN --mount=type=cache,target=/root/.gradle \
+RUN --mount=type=cache,id=gradle-cache,target=/root/.gradle \
     ./gradlew bootJar --no-daemon -x test
 
 # ---- Runtime stage ----
