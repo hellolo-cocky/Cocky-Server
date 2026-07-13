@@ -15,6 +15,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -47,6 +48,21 @@ public class RankingSnapshot {
     @Column(name = "scope_type", nullable = false, length = 20)
     private ScopeType scopeType;
 
+    /** WEEKLY/MONTHLY 집계 기간의 시작일. TWO_DAY는 라운드 단위라 nullable. */
+    @Column(name = "period_start")
+    private LocalDate periodStart;
+
+    /** WEEKLY/MONTHLY 집계 기간의 종료일. TWO_DAY는 라운드 단위라 nullable. */
+    @Column(name = "period_end")
+    private LocalDate periodEnd;
+
+    /**
+     * round_id 대신 유니크 제약에 쓰이는 절대 NULL 아닌 식별자. TWO_DAY는 round.getId()
+     * 문자열, WEEKLY/MONTHLY는 기간 시작일(월요일/1일)의 ISO 문자열.
+     */
+    @Column(name = "period_key", nullable = false, length = 20)
+    private String periodKey;
+
     @Column(name = "`rank`", nullable = false)
     private Integer rank;
 
@@ -56,12 +72,16 @@ public class RankingSnapshot {
     @Column(name = "calculated_at", nullable = false, updatable = false)
     private LocalDateTime calculatedAt;
 
-    public RankingSnapshot(User user, Round round, PeriodType periodType, ScopeType scopeType, Integer rank,
+    public RankingSnapshot(User user, Round round, PeriodType periodType, ScopeType scopeType,
+                            LocalDate periodStart, LocalDate periodEnd, String periodKey, Integer rank,
                             BigDecimal score, LocalDateTime calculatedAt) {
         this.user = user;
         this.round = round;
         this.periodType = periodType;
         this.scopeType = scopeType;
+        this.periodStart = periodStart;
+        this.periodEnd = periodEnd;
+        this.periodKey = periodKey;
         this.rank = rank;
         this.score = score;
         this.calculatedAt = calculatedAt;
