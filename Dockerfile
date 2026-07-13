@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 # ---- Build stage ----
 # 프로젝트가 Gradle wrapper로 9.5.1을 고정하고 있어(gradle/wrapper/gradle-wrapper.properties)
 # 도커 허브의 gradle:8-* 이미지(번들 Gradle 8.x)를 쓰면 버전이 어긋난다. JDK만 있는
@@ -9,12 +11,13 @@ COPY gradlew settings.gradle build.gradle ./
 COPY gradle ./gradle
 RUN chmod +x gradlew
 # 의존성 레이어 캐시 (소스만 바뀌었을 땐 이 레이어가 재사용되어 재다운로드를 건너뜀)
-RUN ./gradlew dependencies --no-daemon || true
+RUN ./gradlew dependencies --no-daemon
 
 COPY src ./src
 # 배포 이미지 빌드 시점에는 테스트를 돌리지 않는다 — 테스트는 CI에서 별도로 검증하고,
 # 여기서는 빌드 속도를 우선한다.
-RUN ./gradlew bootJar --no-daemon -x test
+RUN --mount=type=cache,target=/root/.gradle \
+    ./gradlew bootJar --no-daemon -x test
 
 # ---- Runtime stage ----
 # JRE가 아니라 JDK인 이유: LocalProcessExecutor가 AI 생성 JAVA 답안코드를
@@ -32,5 +35,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=build /app/build/libs/*.jar app.jar
 
+# AI가 생성한 코드를 LocalProcessExecutor가 컨테이너 안에서 직접 실행하는 구조라
+# 일반 스프링 서버보다 비-root 실행의 실익이 크다.
+RUN useradd -u 1001 spring
+USER spring
+
 EXPOSE 8080
+# Spring Actuator 미사용 — 커스텀 헬스체크(HealthCheckController, permitAll)를 그대로 사용.
+# curl/wget 둘 다 베이스 이미지에 이미 있으나 wget으로 통일.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
+    CMD wget -qO- http://localhost:8080/api/v1/health || exit 1
+
 ENTRYPOINT ["java", "-jar", "app.jar"]
