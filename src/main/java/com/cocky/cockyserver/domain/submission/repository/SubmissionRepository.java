@@ -2,6 +2,7 @@ package com.cocky.cockyserver.domain.submission.repository;
 
 import com.cocky.cockyserver.domain.submission.entity.Submission;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -31,6 +32,18 @@ public interface SubmissionRepository extends JpaRepository<Submission, Long> {
             + "group by s.user.id "
             + "order by sum(s.score) desc, s.user.id asc")
     List<UserScoreAggregate> aggregateLatestScoreByUserForRound(@Param("roundId") Long roundId);
+
+    /**
+     * 유저별 "기간 내(round_date 기준) 마지막 제출"(is_latest=true)의 score 합산. WEEKLY/
+     * MONTHLY 랭킹 배치가 여러 라운드에 걸친 점수를 한번에 집계할 때 사용한다.
+     */
+    @Query("select s.user.id as userId, sum(s.score) as totalScore "
+            + "from Submission s where s.latest = true "
+            + "and s.problem.round.roundDate between :start and :end "
+            + "group by s.user.id "
+            + "order by sum(s.score) desc, s.user.id asc")
+    List<UserScoreAggregate> aggregateLatestScoreByUserForPeriod(
+            @Param("start") LocalDate start, @Param("end") LocalDate end);
 
     interface UserScoreAggregate {
         Long getUserId();
