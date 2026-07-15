@@ -11,12 +11,17 @@ import com.cocky.cockyserver.domain.problem.exception.ProblemNotFoundException;
 import com.cocky.cockyserver.domain.problem.repository.ProblemRepository;
 import com.cocky.cockyserver.domain.problem.repository.TestCaseRepository;
 import com.cocky.cockyserver.domain.round.entity.Round;
+import com.cocky.cockyserver.domain.submission.dto.SubmissionDetailResponse;
+import com.cocky.cockyserver.domain.submission.dto.SubmissionFeedbackResponse;
 import com.cocky.cockyserver.domain.submission.dto.SubmissionRequest;
 import com.cocky.cockyserver.domain.submission.dto.SubmissionResponse;
+import com.cocky.cockyserver.domain.submission.dto.SubmissionSummaryResponse;
 import com.cocky.cockyserver.domain.submission.entity.Submission;
 import com.cocky.cockyserver.domain.submission.entity.Verdict;
 import com.cocky.cockyserver.domain.submission.exception.LanguageMismatchException;
 import com.cocky.cockyserver.domain.submission.exception.RoundClosedException;
+import com.cocky.cockyserver.domain.submission.exception.SubmissionAccessDeniedException;
+import com.cocky.cockyserver.domain.submission.exception.SubmissionNotFoundException;
 import com.cocky.cockyserver.domain.submission.exception.TestCaseNotConfiguredException;
 import com.cocky.cockyserver.domain.submission.judge.JudgeRequest;
 import com.cocky.cockyserver.domain.submission.judge.JudgeResult;
@@ -29,8 +34,11 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -189,6 +197,34 @@ public class SubmissionService {
         }
         submission.applyFeedback(timeScore, readabilityScore, originalityScore, feedback.personality());
         return timeScore.add(readabilityScore).add(originalityScore);
+    }
+
+    public Page<SubmissionSummaryResponse> getMySubmissions(Long userId, Pageable pageable) {
+        return submissionRepository.findByUserId(userId, pageable).map(SubmissionSummaryResponse::from);
+    }
+
+    public SubmissionDetailResponse getSubmissionDetail(Long userId, Long submissionId) {
+        return SubmissionDetailResponse.from(findOwnedSubmission(userId, submissionId));
+    }
+
+    /** 세 점수 컬럼이 하나라도 null이면 AI 피드백이 아직 준비되지 않은 것으로 보고 비운다 — 컨트롤러가 202로 처리. */
+    public Optional<SubmissionFeedbackResponse> getFeedback(Long userId, Long submissionId) {
+        Submission submission = findOwnedSubmission(userId, submissionId);
+        if (submission.getTimeScore() == null || submission.getReadabilityScore() == null
+                || submission.getOriginalityScore() == null) {
+            return Optional.empty();
+        }
+        return Optional.of(SubmissionFeedbackResponse.from(submission));
+    }
+
+    private Submission findOwnedSubmission(Long userId, Long submissionId) {
+        Submission submission = submissionRepository.findById(submissionId)
+                .orElseThrow(() -> new SubmissionNotFoundException(
+                        "존재하지 않는 제출입니다. submissionId=" + submissionId));
+        if (!submission.getUser().getId().equals(userId)) {
+            throw new SubmissionAccessDeniedException("본인의 제출만 조회할 수 있습니다. submissionId=" + submissionId);
+        }
+        return submission;
     }
 
     private TestCaseIO toTestCaseIO(TestCase testCase) {
