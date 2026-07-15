@@ -1,5 +1,7 @@
 package com.cocky.cockyserver.domain.admin.controller;
 
+import com.cocky.cockyserver.domain.admin.dto.AdminGenerationLogsResponse;
+import com.cocky.cockyserver.domain.admin.service.AdminService;
 import com.cocky.cockyserver.domain.ranking.dto.RankingSnapshotResult;
 import com.cocky.cockyserver.domain.ranking.service.RankingBatchService;
 import com.cocky.cockyserver.domain.round.dto.RoundGenerationResult;
@@ -7,6 +9,7 @@ import com.cocky.cockyserver.domain.round.service.RoundSchedulerService;
 import com.cocky.cockyserver.global.entity.PeriodType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -20,6 +23,7 @@ public class AdminController {
 
     private final RoundSchedulerService roundSchedulerService;
     private final RankingBatchService rankingBatchService;
+    private final AdminService adminService;
 
     @PostMapping("/scheduler/round-generation")
     public ResponseEntity<RoundGenerationResult> triggerRoundGeneration() {
@@ -35,5 +39,10 @@ public class AdminController {
             case MONTHLY -> rankingBatchService.generateMonthlySnapshot();
         };
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/problem-generation-logs")
+    public ResponseEntity<AdminGenerationLogsResponse> getFailedGenerationLogs() {
+        return ResponseEntity.ok(adminService.getFailedGenerationLogs());
     }
 }
