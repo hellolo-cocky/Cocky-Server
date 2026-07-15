@@ -11,8 +11,12 @@ import com.cocky.cockyserver.domain.ranking.exception.UnsupportedRankingCombinat
 import com.cocky.cockyserver.domain.round.exception.RoundNotFoundException;
 import com.cocky.cockyserver.domain.submission.exception.LanguageMismatchException;
 import com.cocky.cockyserver.domain.submission.exception.RoundClosedException;
+import com.cocky.cockyserver.domain.submission.exception.SubmissionAccessDeniedException;
+import com.cocky.cockyserver.domain.submission.exception.SubmissionNotFoundException;
 import com.cocky.cockyserver.domain.submission.exception.TestCaseNotConfiguredException;
 import com.cocky.cockyserver.domain.submission.judge.JudgeExecutionException;
+import com.cocky.cockyserver.domain.topic.exception.TopicNotFoundException;
+import com.cocky.cockyserver.domain.user.exception.UserNotFoundException;
 import com.cocky.cockyserver.global.security.AuthErrorCode;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +24,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 /** JwtAuthenticationEntryPoint의 401 응답과 동일한 {code, message} 형태로 에러를 내려준다. */
 @RestControllerAdvice
@@ -112,5 +117,37 @@ public class GlobalExceptionHandler {
             UnsupportedRankingCombinationException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse("UNSUPPORTED_RANKING_COMBINATION", e.getMessage()));
+    }
+
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleUserNotFound(UserNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponse("USER_NOT_FOUND", e.getMessage()));
+    }
+
+    @ExceptionHandler(SubmissionNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleSubmissionNotFound(SubmissionNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponse("SUBMISSION_NOT_FOUND", e.getMessage()));
+    }
+
+    @ExceptionHandler(SubmissionAccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleSubmissionAccessDenied(SubmissionAccessDeniedException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ErrorResponse("SUBMISSION_ACCESS_DENIED", e.getMessage()));
+    }
+
+    /** language/difficulty/sort 등 @RequestParam enum 값이 유효하지 않을 때(400). */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        String message = "요청 값이 올바르지 않습니다: %s=%s".formatted(e.getName(), e.getValue());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse("INVALID_REQUEST", message));
+    }
+
+    @ExceptionHandler(TopicNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleTopicNotFound(TopicNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponse("TOPIC_NOT_FOUND", e.getMessage()));
     }
 }
