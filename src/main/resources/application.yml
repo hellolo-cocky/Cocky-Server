@@ -44,6 +44,7 @@ datagsm:
 auth:
   admin-emails: ${ADMIN_EMAILS:}
 
+
 judge0:
   # 비어 있으면(미설정) Judge0Config가 StubJudgeService로 폴백한다 — OPENAI_API_KEY 부재 시
   # AI 모듈이 데모 모드로 도는 것과 동일한 패턴. 로컬에서 Judge0를 직접 띄워 붙일 땐

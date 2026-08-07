@@ -16,9 +16,10 @@ import org.slf4j.LoggerFactory;
  *
  * <p>실제 코드 실행/채점을 전혀 수행하지 않는다. 기본 동작은 전체 케이스 AC(만점)이고,
  * 제출 코드 첫 줄의 매직 주석으로만 다른 verdict를 흉내낸다. 스텁이라는 사실을 절대
- * 숨기지 않는다 — 기동 시 배너, 호출마다 WARN 로그를 남긴다(CLAUDE.md §8.5: 채점 엔진은
- * 12월 이후 자체 엔진으로 교체 예정이며, Judge0/스텁 어느 쪽 구현 세부사항도
- * {@link JudgeService} 인터페이스 밖으로 새면 안 된다).
+ * 숨기지 않는다 — 기동 시 배너는 WARN(놓치면 안 됨), 호출마다는 INFO 로그를 남긴다(리뷰
+ * 반영 — 호출마다 WARN이면 트래픽이 늘 때 정작 중요한 경고가 로그에 묻힌다). CLAUDE.md
+ * §8.5: 채점 엔진은 12월 이후 자체 엔진으로 교체 예정이며, Judge0/스텁 어느 쪽 구현
+ * 세부사항도 {@link JudgeService} 인터페이스 밖으로 새면 안 된다.
  *
  * <p>주의: 채점 호출({@link #judge})은 {@code SubmissionService}가 아직 Submission
  * 엔티티를 저장하기 전에 실행되어 실제 제출(submission) PK가 없다. 그래서 로그에는 DB
@@ -64,7 +65,9 @@ public class StubJudgeService implements JudgeService {
                 ? new JudgeResult(Verdict.AC, total, total, DUMMY_TIME_MS, DUMMY_MEMORY_KB)
                 : buildForcedResult(forced, total);
 
-        log.warn("[STUB 채점] requestId={}, language={}, verdict={} ({}/{} 통과) — 가짜 채점 결과입니다(Judge0 미연동).",
+        // 기동 배너는 WARN(놓치면 안 됨)이지만, 호출마다 찍히는 이 로그까지 WARN이면 트래픽이
+        // 늘 때 로그가 WARN으로 도배돼 정작 중요한 경고를 묻히게 한다 — INFO로 낮춘다(리뷰 반영).
+        log.info("[STUB 채점] requestId={}, language={}, verdict={} ({}/{} 통과) — 가짜 채점 결과입니다(Judge0 미연동).",
                 requestId, request.language(), result.verdict(), result.passedCount(), result.totalCount());
 
         return result;
