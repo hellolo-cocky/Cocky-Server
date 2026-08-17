@@ -3,7 +3,7 @@ services:
     image: mysql:8.0
     container_name: cocky-mysql
     ports:
-      - "3308:3306"
+      - "13306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: cocky
       MYSQL_DATABASE: cocky
