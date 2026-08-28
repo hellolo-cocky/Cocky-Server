@@ -15,6 +15,7 @@ import com.cocky.cockyserver.domain.problem.entity.TestCase;
 import com.cocky.cockyserver.domain.problem.repository.ProblemRepository;
 import com.cocky.cockyserver.domain.problem.repository.TestCaseRepository;
 import com.cocky.cockyserver.domain.round.RoundSubtypes;
+import com.cocky.cockyserver.domain.round.TopicRotationPolicy;
 import com.cocky.cockyserver.domain.round.dto.RoundGenerationResult;
 import com.cocky.cockyserver.domain.round.entity.Round;
 import com.cocky.cockyserver.domain.round.repository.RoundRepository;
@@ -47,7 +48,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class RoundSchedulerService {
 
     private static final Logger log = LoggerFactory.getLogger(RoundSchedulerService.class);
-    private static final int TOTAL_TOPICS = 8;
 
     private final RoundRepository roundRepository;
     private final TopicRepository topicRepository;
@@ -121,7 +121,7 @@ public class RoundSchedulerService {
         }
 
         int nextWeekOrder = roundRepository.findTopByOrderByRoundDateDesc()
-                .map(prev -> (prev.getTopic().getWeekOrder() % TOTAL_TOPICS) + 1)
+                .map(prev -> TopicRotationPolicy.next(prev.getTopic().getWeekOrder()))
                 .orElse(1);
         Topic topic = topicRepository.findByWeekOrder(nextWeekOrder)
                 .orElseThrow(() -> new IllegalStateException(
