@@ -1,5 +1,6 @@
 package com.cocky.cockyserver.domain.topic.service;
 
+import com.cocky.cockyserver.domain.round.TopicRotationPolicy;
 import com.cocky.cockyserver.domain.round.entity.Round;
 import com.cocky.cockyserver.domain.round.exception.RoundNotFoundException;
 import com.cocky.cockyserver.domain.round.repository.RoundRepository;
@@ -16,8 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class TopicService {
 
-    private static final int TOTAL_TOPICS = 8;
-
     private final RoundService roundService;
     private final RoundRepository roundRepository;
     private final TopicRepository topicRepository;
@@ -27,11 +26,11 @@ public class TopicService {
         return TopicResponse.from(resolveCurrentRound().getTopic());
     }
 
-    /** 다음 주제 weekOrder 계산은 RoundSchedulerService.planNextRound와 동일한 공식(% 8 + 1)을 따른다. */
+    /** 다음 주제 weekOrder 계산은 {@link TopicRotationPolicy}(RoundSchedulerService와 공유하는 도메인 규칙)를 따른다. */
     @Transactional(readOnly = true)
     public TopicResponse getNextTopic() {
         int currentWeekOrder = resolveCurrentRound().getTopic().getWeekOrder();
-        int nextWeekOrder = (currentWeekOrder % TOTAL_TOPICS) + 1;
+        int nextWeekOrder = TopicRotationPolicy.next(currentWeekOrder);
         Topic nextTopic = topicRepository.findByWeekOrder(nextWeekOrder)
                 .orElseThrow(() -> new TopicNotFoundException("weekOrder=" + nextWeekOrder + "인 주제가 없습니다."));
         return TopicResponse.from(nextTopic);
