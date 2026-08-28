@@ -121,7 +121,7 @@ public class RoundSchedulerService {
         }
 
         int nextWeekOrder = roundRepository.findTopByOrderByRoundDateDesc()
-                .map(prev -> (prev.getTopic().getWeekOrder() % TOTAL_TOPICS) + 1)
+                .map(prev -> nextWeekOrder(prev.getTopic().getWeekOrder()))
                 .orElse(1);
         Topic topic = topicRepository.findByWeekOrder(nextWeekOrder)
                 .orElseThrow(() -> new IllegalStateException(
@@ -210,6 +210,15 @@ public class RoundSchedulerService {
 
         aiGenerationLogRepository.save(
                 AiGenerationLog.success(round, problem, sequenceNo, generated.subtype(), item.attempts()));
+    }
+
+    /**
+     * 다음 주차 계산: 현재 weekOrder(1~8) 기준 다음 주차. 8주 순환이라 8 다음은 1로 돌아간다.
+     * 회차 스케줄러와 기간 피드백 통계 집계({@code FeedbackService})가 함께 쓰는 단일 계산식이라
+     * static으로 꺼내 두었다 — 새 회차를 실제로 만들지 않고 "다음 주제가 뭔지"만 알고 싶을 때 재사용한다.
+     */
+    public static int nextWeekOrder(int currentWeekOrder) {
+        return (currentWeekOrder % TOTAL_TOPICS) + 1;
     }
 
     private record Plan(Topic topic, String roundSubtype, List<String> pastTypes, List<String> pastStatements) {
