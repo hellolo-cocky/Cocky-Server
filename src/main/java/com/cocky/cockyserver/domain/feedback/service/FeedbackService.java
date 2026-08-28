@@ -6,8 +6,8 @@ import com.cocky.cockyserver.ai.dto.Period;
 import com.cocky.cockyserver.ai.dto.PeriodFeedback;
 import com.cocky.cockyserver.ai.dto.PeriodStats;
 import com.cocky.cockyserver.ai.port.PeriodFeedbackProvider;
+import com.cocky.cockyserver.domain.round.TopicRotationPolicy;
 import com.cocky.cockyserver.domain.round.repository.RoundRepository;
-import com.cocky.cockyserver.domain.round.service.RoundSchedulerService;
 import com.cocky.cockyserver.domain.submission.repository.SubmissionRepository;
 import com.cocky.cockyserver.domain.topic.entity.Topic;
 import com.cocky.cockyserver.domain.topic.repository.TopicRepository;
@@ -64,12 +64,11 @@ public class FeedbackService {
 
         Map<Language, Integer> languageCounts = new EnumMap<>(Language.class);
         submissionRepository.aggregateLanguageCountsByUserAndPeriod(userId, start, end)
-                .forEach(row -> languageCounts.put(Language.valueOf(row.getLanguage().name()), row.getCount().intValue()));
+                .forEach(row -> languageCounts.put(toAiLanguage(row.getLanguage()), row.getCount().intValue()));
 
         Map<Difficulty, Integer> difficultyCounts = new EnumMap<>(Difficulty.class);
         submissionRepository.aggregateDifficultyCountsByUserAndPeriod(userId, start, end)
-                .forEach(row -> difficultyCounts.put(
-                        Difficulty.valueOf(row.getDifficulty().name()), row.getCount().intValue()));
+                .forEach(row -> difficultyCounts.put(toAiDifficulty(row.getDifficulty()), row.getCount().intValue()));
 
         Map<String, Integer> wrongTypeCounts = new LinkedHashMap<>();
         submissionRepository.aggregateWrongVerdictCountsByUserAndPeriod(userId, start, end)
@@ -113,18 +112,40 @@ public class FeedbackService {
     /**
      * 다음 기간 대주제. ROUND는 예습 추천이 없어(Period 문서 참고) null로 비워 불필요한 조회를
      * 생략한다. WEEKLY/MONTHLY는 가장 최근 라운드의 주제 weekOrder를 기준으로
-     * {@link RoundSchedulerService#nextWeekOrder}(동일 계산식 재사용)로 다음 주차를 구한 뒤
-     * topic 이름을 찾는다 — RoundSchedulerService가 다음 회차를 계획할 때 쓰는 것과 같은 방식이다.
+     * {@link TopicRotationPolicy#next}(회차 스케줄러와 공유하는 도메인 규칙)로 다음 주차를 구한 뒤
+     * topic 이름을 찾는다 — RoundSchedulerService가 다음 회차를 계획할 때 쓰는 것과 같은 규칙이다.
      */
     private String resolveNextTopic(Period period) {
         if (period == Period.ROUND) {
             return null;
         }
         return roundRepository.findTopByOrderByRoundDateDesc()
-                .map(latest -> RoundSchedulerService.nextWeekOrder(latest.getTopic().getWeekOrder()))
+                .map(latest -> TopicRotationPolicy.next(latest.getTopic().getWeekOrder()))
                 .flatMap(topicRepository::findByWeekOrder)
                 .map(Topic::getName)
                 .orElse(null);
+    }
+
+    /**
+     * domain.problem.entity.Language → ai.dto.Language(AI 모듈 계약, judge0Id 보유) 변환.
+     * 두 enum은 의도적으로 분리된 타입이라 통합하지 않는다 — {@code valueOf(name())} 대신 switch로
+     * 명시 매핑해서, 도메인에 새 언어가 추가돼도(default 없음) 여기서 컴파일 에러로 바로 드러나게 한다.
+     */
+    private static Language toAiLanguage(com.cocky.cockyserver.domain.problem.entity.Language domainLanguage) {
+        return switch (domainLanguage) {
+            case PYTHON -> Language.PYTHON;
+            case C -> Language.C;
+            case JAVA -> Language.JAVA;
+        };
+    }
+
+    /** {@link #toAiLanguage}와 같은 이유로 switch 명시 매핑 — domain.problem.entity.Difficulty → ai.dto.Difficulty. */
+    private static Difficulty toAiDifficulty(com.cocky.cockyserver.domain.problem.entity.Difficulty domainDifficulty) {
+        return switch (domainDifficulty) {
+            case EASY -> Difficulty.EASY;
+            case NORMAL -> Difficulty.NORMAL;
+            case HARD -> Difficulty.HARD;
+        };
     }
 
     private record PeriodWindow(LocalDateTime start, LocalDateTime end) {
