@@ -23,6 +23,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,9 +38,12 @@ import org.mockito.ArgumentCaptor;
  */
 class FeedbackServiceTest {
 
+    // CI/로컬 timezone에 따라 주간 윈도우 테스트의 요일이 밀리지 않도록 고정 zone을 쓴다.
+    private static final ZoneId TEST_ZONE = ZoneOffset.UTC;
+
     private FeedbackService serviceAt(LocalDateTime now, SubmissionRepository submissionRepository,
                                        RoundRepository roundRepository) {
-        Clock clock = Clock.fixed(now.atZone(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault());
+        Clock clock = Clock.fixed(now.atZone(TEST_ZONE).toInstant(), TEST_ZONE);
         TopicRepository topicRepository = mock(TopicRepository.class);
         PeriodFeedbackProvider periodFeedbackProvider = mock(PeriodFeedbackProvider.class);
         return new FeedbackService(submissionRepository, roundRepository, topicRepository,
@@ -123,7 +127,7 @@ class FeedbackServiceTest {
 
     private FeedbackService newService(SubmissionRepository submissionRepository,
                                         RoundRepository roundRepository, TopicRepository topicRepository) {
-        Clock clock = Clock.fixed(FIXED_NOW.atZone(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault());
+        Clock clock = Clock.fixed(FIXED_NOW.atZone(TEST_ZONE).toInstant(), TEST_ZONE);
         PeriodFeedbackProvider periodFeedbackProvider = mock(PeriodFeedbackProvider.class);
         return new FeedbackService(submissionRepository, roundRepository, topicRepository,
                 periodFeedbackProvider, clock);
@@ -162,11 +166,7 @@ class FeedbackServiceTest {
         return row;
     }
 
-    // 참고: languageCounts/difficultyCounts 프로젝션은 String이 아니라 domain enum(Language/
-    // Difficulty)을 그대로 반환하고, toAiLanguage/toAiDifficulty는 default 없는 switch로 도메인
-    // enum을 전부 매핑한다. 즉 "알 수 없는 key"는 컴파일 타임에 이미 막혀 있어(존재하지 않는
-    // 도메인 enum 상수를 런타임에 만들 방법이 없음) 재현 가능한 케이스가 아니다 — 그래서 이
-    // 섹션엔 해당 테스트가 없다.
+    // Projection이 domain enum을 반환하므로 알 수 없는 enum 값은 재현할 수 없다.
 
     @Test
     void 언어별_집계가_ai_Language로_정상_변환된다() {
