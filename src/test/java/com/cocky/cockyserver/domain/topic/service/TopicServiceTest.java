@@ -74,12 +74,12 @@ class TopicServiceTest {
     }
 
     @Test
-    void nextTopic_incrementsWeekOrder() {
+    void nextTopic_incrementsTopicOrder() {
         topicService = new TopicService(roundService, roundRepository, topicRepository);
         Topic current = new Topic("배열", 3);
         Topic next = new Topic("그래프", 4);
         when(roundService.getCurrentActiveRound()).thenReturn(round(current));
-        when(topicRepository.findByWeekOrder(4)).thenReturn(Optional.of(next));
+        when(topicRepository.findByTopicOrder(4)).thenReturn(Optional.of(next));
 
         TopicResponse response = topicService.getNextTopic();
 
@@ -93,7 +93,7 @@ class TopicServiceTest {
         Topic current = new Topic("마무리", 8);
         Topic first = new Topic("구현", 1);
         when(roundService.getCurrentActiveRound()).thenReturn(round(current));
-        when(topicRepository.findByWeekOrder(1)).thenReturn(Optional.of(first));
+        when(topicRepository.findByTopicOrder(1)).thenReturn(Optional.of(first));
 
         TopicResponse response = topicService.getNextTopic();
 
@@ -106,7 +106,7 @@ class TopicServiceTest {
         topicService = new TopicService(roundService, roundRepository, topicRepository);
         Topic current = new Topic("마무리", 8);
         when(roundService.getCurrentActiveRound()).thenReturn(round(current));
-        when(topicRepository.findByWeekOrder(1)).thenReturn(Optional.empty());
+        when(topicRepository.findByTopicOrder(1)).thenReturn(Optional.empty());
 
         assertThrows(TopicNotFoundException.class, () -> topicService.getNextTopic());
     }

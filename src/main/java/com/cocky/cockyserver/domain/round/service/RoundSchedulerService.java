@@ -120,12 +120,12 @@ public class RoundSchedulerService {
             return null;
         }
 
-        int nextWeekOrder = roundRepository.findTopByOrderByRoundDateDesc()
-                .map(prev -> TopicRotationPolicy.next(prev.getTopic().getWeekOrder()))
+        int nextTopicOrder = roundRepository.findTopByOrderByRoundDateDesc()
+                .map(prev -> TopicRotationPolicy.next(prev.getTopic().getTopicOrder()))
                 .orElse(1);
-        Topic topic = topicRepository.findByWeekOrder(nextWeekOrder)
+        Topic topic = topicRepository.findByTopicOrder(nextTopicOrder)
                 .orElseThrow(() -> new IllegalStateException(
-                        "week_order=" + nextWeekOrder + "인 topic이 없습니다 — V5 시드 확인 필요"));
+                        "topicOrder=" + nextTopicOrder + "인 topic이 없습니다 — V5 시드 확인 필요"));
 
         List<String> pastTypes = aiGenerationLogRepository.findTop30BySubtypeIsNotNullOrderByCreatedAtDesc().stream()
                 .map(AiGenerationLog::getSubtype)

@@ -80,11 +80,11 @@ class RoundSchedulerServiceTest {
         return new Topic("구현", 1);
     }
 
-    /** 최초 실행 가정(직전 라운드 없음) — nextWeekOrder=1로 계획을 세우는 공통 스텁. */
+    /** 최초 실행 가정(직전 라운드 없음) — nextTopicOrder=1로 계획을 세우는 공통 스텁. */
     private void stubFreshPlan() {
         when(roundRepository.findByRoundDate(TARGET_DATE)).thenReturn(Optional.empty());
         when(roundRepository.findTopByOrderByRoundDateDesc()).thenReturn(Optional.empty());
-        when(topicRepository.findByWeekOrder(1)).thenReturn(Optional.of(topic()));
+        when(topicRepository.findByTopicOrder(1)).thenReturn(Optional.of(topic()));
         when(aiGenerationLogRepository.findTop30BySubtypeIsNotNullOrderByCreatedAtDesc()).thenReturn(List.of());
         when(problemRepository.findTop20ByOrderByCreatedAtDesc()).thenReturn(List.of());
     }

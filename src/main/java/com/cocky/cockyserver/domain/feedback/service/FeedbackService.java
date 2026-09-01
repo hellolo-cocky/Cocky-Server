@@ -112,8 +112,8 @@ public class FeedbackService {
 
     /**
      * 다음 기간 대주제. ROUND는 예습 추천이 없어(Period 문서 참고) null로 비워 불필요한 조회를
-     * 생략한다. WEEKLY/MONTHLY는 가장 최근에 "마감된" 라운드의 주제 weekOrder를 기준으로
-     * {@link TopicRotationPolicy#next}(회차 스케줄러와 공유하는 도메인 규칙)로 다음 주차를 구한 뒤
+     * 생략한다. WEEKLY/MONTHLY는 가장 최근에 "마감된" 라운드의 주제 topicOrder를 기준으로
+     * {@link TopicRotationPolicy#next}(회차 스케줄러와 공유하는 도메인 규칙)로 다음 순번을 구한 뒤
      * topic 이름을 찾는다.
      *
      * <p>{@code findTopByOrderByRoundDateDesc}(마감 여부 무관, 단순 최신)가 아니라
@@ -127,8 +127,8 @@ public class FeedbackService {
             return null;
         }
         return roundRepository.findTopByCloseAtLessThanEqualOrderByCloseAtDesc(now)
-                .map(latest -> TopicRotationPolicy.next(latest.getTopic().getWeekOrder()))
-                .flatMap(topicRepository::findByWeekOrder)
+                .map(latest -> TopicRotationPolicy.next(latest.getTopic().getTopicOrder()))
+                .flatMap(topicRepository::findByTopicOrder)
                 .map(Topic::getName)
                 .orElse(null);
     }

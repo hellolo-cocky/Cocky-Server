@@ -26,13 +26,13 @@ public class TopicService {
         return TopicResponse.from(resolveCurrentRound().getTopic());
     }
 
-    /** 다음 주제 weekOrder 계산은 {@link TopicRotationPolicy}(RoundSchedulerService와 공유하는 도메인 규칙)를 따른다. */
+    /** 다음 주제 topicOrder 계산은 {@link TopicRotationPolicy}(RoundSchedulerService와 공유하는 도메인 규칙)를 따른다. */
     @Transactional(readOnly = true)
     public TopicResponse getNextTopic() {
-        int currentWeekOrder = resolveCurrentRound().getTopic().getWeekOrder();
-        int nextWeekOrder = TopicRotationPolicy.next(currentWeekOrder);
-        Topic nextTopic = topicRepository.findByWeekOrder(nextWeekOrder)
-                .orElseThrow(() -> new TopicNotFoundException("weekOrder=" + nextWeekOrder + "인 주제가 없습니다."));
+        int currentTopicOrder = resolveCurrentRound().getTopic().getTopicOrder();
+        int nextTopicOrder = TopicRotationPolicy.next(currentTopicOrder);
+        Topic nextTopic = topicRepository.findByTopicOrder(nextTopicOrder)
+                .orElseThrow(() -> new TopicNotFoundException("topicOrder=" + nextTopicOrder + "인 주제가 없습니다."));
         return TopicResponse.from(nextTopic);
     }
 
