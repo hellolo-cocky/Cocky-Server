@@ -4,18 +4,27 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.cocky.cockyserver.ai.dto.Difficulty;
+import com.cocky.cockyserver.ai.dto.Language;
 import com.cocky.cockyserver.ai.dto.Period;
+import com.cocky.cockyserver.ai.dto.PeriodStats;
 import com.cocky.cockyserver.ai.port.PeriodFeedbackProvider;
+import com.cocky.cockyserver.domain.round.entity.Round;
 import com.cocky.cockyserver.domain.round.repository.RoundRepository;
+import com.cocky.cockyserver.domain.submission.entity.Verdict;
 import com.cocky.cockyserver.domain.submission.repository.SubmissionRepository;
+import com.cocky.cockyserver.domain.topic.entity.Topic;
 import com.cocky.cockyserver.domain.topic.repository.TopicRepository;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -105,5 +114,227 @@ class FeedbackServiceTest {
         LocalDateTime expectedEnd = LocalDateTime.of(2026, 7, 1, 0, 0);
         assertThat(wednesdayCall).containsExactly(expectedStart, expectedEnd);
         assertThat(saturdayCall).containsExactly(expectedStart, expectedEnd);
+    }
+
+    // ── 여기부터 aggregateStats() 관련 테스트: enum 매핑 / resolveNextTopic 분기.
+    // window()와 달리 topicRepository도 검증 대상이라 직접 mock을 만들어 넘긴다.
+
+    private static final LocalDateTime FIXED_NOW = LocalDateTime.of(2026, 7, 8, 12, 0); // 수요일
+
+    private FeedbackService newService(SubmissionRepository submissionRepository,
+                                        RoundRepository roundRepository, TopicRepository topicRepository) {
+        Clock clock = Clock.fixed(FIXED_NOW.atZone(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault());
+        PeriodFeedbackProvider periodFeedbackProvider = mock(PeriodFeedbackProvider.class);
+        return new FeedbackService(submissionRepository, roundRepository, topicRepository,
+                periodFeedbackProvider, clock);
+    }
+
+    /** 세 집계 쿼리를 전부 빈 리스트로 스텁한다 — enum 매핑/resolveNextTopic 테스트에서 관심 없는 축은 이걸로 무시. */
+    private void stubEmptyAggregates(SubmissionRepository submissionRepository) {
+        when(submissionRepository.aggregateLanguageCountsByUserAndPeriod(any(), any(), any()))
+                .thenReturn(List.of());
+        when(submissionRepository.aggregateDifficultyCountsByUserAndPeriod(any(), any(), any()))
+                .thenReturn(List.of());
+        when(submissionRepository.aggregateWrongVerdictCountsByUserAndPeriod(any(), any(), any()))
+                .thenReturn(List.of());
+    }
+
+    private SubmissionRepository.LanguageCount languageCount(
+            com.cocky.cockyserver.domain.problem.entity.Language language, long count) {
+        SubmissionRepository.LanguageCount row = mock(SubmissionRepository.LanguageCount.class);
+        when(row.getLanguage()).thenReturn(language);
+        when(row.getCount()).thenReturn(count);
+        return row;
+    }
+
+    private SubmissionRepository.DifficultyCount difficultyCount(
+            com.cocky.cockyserver.domain.problem.entity.Difficulty difficulty, long count) {
+        SubmissionRepository.DifficultyCount row = mock(SubmissionRepository.DifficultyCount.class);
+        when(row.getDifficulty()).thenReturn(difficulty);
+        when(row.getCount()).thenReturn(count);
+        return row;
+    }
+
+    private SubmissionRepository.VerdictCount verdictCount(Verdict verdict, long count) {
+        SubmissionRepository.VerdictCount row = mock(SubmissionRepository.VerdictCount.class);
+        when(row.getVerdict()).thenReturn(verdict);
+        when(row.getCount()).thenReturn(count);
+        return row;
+    }
+
+    // 참고: languageCounts/difficultyCounts 프로젝션은 String이 아니라 domain enum(Language/
+    // Difficulty)을 그대로 반환하고, toAiLanguage/toAiDifficulty는 default 없는 switch로 도메인
+    // enum을 전부 매핑한다. 즉 "알 수 없는 key"는 컴파일 타임에 이미 막혀 있어(존재하지 않는
+    // 도메인 enum 상수를 런타임에 만들 방법이 없음) 재현 가능한 케이스가 아니다 — 그래서 이
+    // 섹션엔 해당 테스트가 없다.
+
+    @Test
+    void 언어별_집계가_ai_Language로_정상_변환된다() {
+        SubmissionRepository submissionRepository = mock(SubmissionRepository.class);
+        RoundRepository roundRepository = mock(RoundRepository.class);
+        TopicRepository topicRepository = mock(TopicRepository.class);
+        stubEmptyAggregates(submissionRepository);
+        // 주의: helper(languageCount 등) 내부에도 when(...).thenReturn(...)이 있어서, 이 List.of(...)를
+        // 바깥 when(...).thenReturn(...) 인자 자리에서 바로 평가하면 Mockito의 "ongoing stubbing" 슬롯이
+        // 바깥 when()이 끝나기 전에 안쪽 when()에 뺏겨 UnfinishedStubbingException이 난다. 그래서 리스트를
+        // 먼저 로컬 변수로 완성한 뒤 넘긴다.
+        List<SubmissionRepository.LanguageCount> rows = List.of(
+                languageCount(com.cocky.cockyserver.domain.problem.entity.Language.PYTHON, 3),
+                languageCount(com.cocky.cockyserver.domain.problem.entity.Language.C, 1),
+                languageCount(com.cocky.cockyserver.domain.problem.entity.Language.JAVA, 2));
+        when(submissionRepository.aggregateLanguageCountsByUserAndPeriod(any(), any(), any()))
+                .thenReturn(rows);
+        when(roundRepository.findTopByOrderByRoundDateDesc()).thenReturn(Optional.empty());
+
+        PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
+                .aggregateStats(1L, Period.WEEKLY);
+
+        assertThat(stats.languageCounts()).containsExactlyInAnyOrderEntriesOf(
+                Map.of(Language.PYTHON, 3, Language.C, 1, Language.JAVA, 2));
+    }
+
+    @Test
+    void 난이도별_집계가_ai_Difficulty로_정상_변환된다() {
+        SubmissionRepository submissionRepository = mock(SubmissionRepository.class);
+        RoundRepository roundRepository = mock(RoundRepository.class);
+        TopicRepository topicRepository = mock(TopicRepository.class);
+        stubEmptyAggregates(submissionRepository);
+        List<SubmissionRepository.DifficultyCount> rows = List.of(
+                difficultyCount(com.cocky.cockyserver.domain.problem.entity.Difficulty.EASY, 4),
+                difficultyCount(com.cocky.cockyserver.domain.problem.entity.Difficulty.NORMAL, 5),
+                difficultyCount(com.cocky.cockyserver.domain.problem.entity.Difficulty.HARD, 1));
+        when(submissionRepository.aggregateDifficultyCountsByUserAndPeriod(any(), any(), any()))
+                .thenReturn(rows);
+        when(roundRepository.findTopByOrderByRoundDateDesc()).thenReturn(Optional.empty());
+
+        PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
+                .aggregateStats(1L, Period.WEEKLY);
+
+        assertThat(stats.difficultyCounts()).containsExactlyInAnyOrderEntriesOf(
+                Map.of(Difficulty.EASY, 4, Difficulty.NORMAL, 5, Difficulty.HARD, 1));
+    }
+
+    @Test
+    void 오답유형별_집계는_verdict_name을_키로_사용한다() {
+        SubmissionRepository submissionRepository = mock(SubmissionRepository.class);
+        RoundRepository roundRepository = mock(RoundRepository.class);
+        TopicRepository topicRepository = mock(TopicRepository.class);
+        stubEmptyAggregates(submissionRepository);
+        List<SubmissionRepository.VerdictCount> rows = List.of(verdictCount(Verdict.WA, 2), verdictCount(Verdict.TLE, 1));
+        when(submissionRepository.aggregateWrongVerdictCountsByUserAndPeriod(any(), any(), any()))
+                .thenReturn(rows);
+        when(roundRepository.findTopByOrderByRoundDateDesc()).thenReturn(Optional.empty());
+
+        PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
+                .aggregateStats(1L, Period.WEEKLY);
+
+        assertThat(stats.wrongTypeCounts()).containsExactlyInAnyOrderEntriesOf(Map.of("WA", 2, "TLE", 1));
+    }
+
+    @Test
+    void 집계_결과가_비어있으면_세_Map_모두_빈_Map을_반환한다() {
+        SubmissionRepository submissionRepository = mock(SubmissionRepository.class);
+        RoundRepository roundRepository = mock(RoundRepository.class);
+        TopicRepository topicRepository = mock(TopicRepository.class);
+        stubEmptyAggregates(submissionRepository);
+        when(roundRepository.findTopByOrderByRoundDateDesc()).thenReturn(Optional.empty());
+
+        PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
+                .aggregateStats(1L, Period.WEEKLY);
+
+        assertThat(stats.languageCounts()).isEmpty();
+        assertThat(stats.difficultyCounts()).isEmpty();
+        assertThat(stats.wrongTypeCounts()).isEmpty();
+    }
+
+    // ── resolveNextTopic 분기.
+
+    @Test
+    void ROUND_기간은_다음_주제를_조회하지_않고_null을_반환한다() {
+        SubmissionRepository submissionRepository = mock(SubmissionRepository.class);
+        RoundRepository roundRepository = mock(RoundRepository.class);
+        TopicRepository topicRepository = mock(TopicRepository.class);
+        stubEmptyAggregates(submissionRepository);
+        Topic topic = new Topic("주제", 3);
+        Round closedRound = new Round(topic, LocalDate.of(2026, 7, 6),
+                LocalDateTime.of(2026, 7, 6, 0, 0), LocalDateTime.of(2026, 7, 7, 0, 0));
+        when(roundRepository.findTopByCloseAtLessThanEqualOrderByCloseAtDesc(any()))
+                .thenReturn(Optional.of(closedRound));
+
+        PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
+                .aggregateStats(1L, Period.ROUND);
+
+        assertThat(stats.nextTopic()).isNull();
+        verify(roundRepository, never()).findTopByOrderByRoundDateDesc();
+    }
+
+    @Test
+    void 최근_라운드가_없으면_다음_주제는_null이다() {
+        SubmissionRepository submissionRepository = mock(SubmissionRepository.class);
+        RoundRepository roundRepository = mock(RoundRepository.class);
+        TopicRepository topicRepository = mock(TopicRepository.class);
+        stubEmptyAggregates(submissionRepository);
+        when(roundRepository.findTopByOrderByRoundDateDesc()).thenReturn(Optional.empty());
+
+        PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
+                .aggregateStats(1L, Period.WEEKLY);
+
+        assertThat(stats.nextTopic()).isNull();
+    }
+
+    @Test
+    void 다음_주차_주제가_아직_없으면_null을_반환한다() {
+        SubmissionRepository submissionRepository = mock(SubmissionRepository.class);
+        RoundRepository roundRepository = mock(RoundRepository.class);
+        TopicRepository topicRepository = mock(TopicRepository.class);
+        stubEmptyAggregates(submissionRepository);
+        Topic currentTopic = new Topic("3주차_주제", 3);
+        Round latestRound = new Round(currentTopic, LocalDate.of(2026, 7, 6),
+                LocalDateTime.of(2026, 7, 6, 0, 0), LocalDateTime.of(2026, 7, 7, 0, 0));
+        when(roundRepository.findTopByOrderByRoundDateDesc()).thenReturn(Optional.of(latestRound));
+        when(topicRepository.findByWeekOrder(4)).thenReturn(Optional.empty());
+
+        PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
+                .aggregateStats(1L, Period.WEEKLY);
+
+        assertThat(stats.nextTopic()).isNull();
+    }
+
+    @Test
+    void 다음_주차_주제_이름을_정상적으로_반환한다() {
+        SubmissionRepository submissionRepository = mock(SubmissionRepository.class);
+        RoundRepository roundRepository = mock(RoundRepository.class);
+        TopicRepository topicRepository = mock(TopicRepository.class);
+        stubEmptyAggregates(submissionRepository);
+        Topic currentTopic = new Topic("3주차_주제", 3);
+        Round latestRound = new Round(currentTopic, LocalDate.of(2026, 7, 6),
+                LocalDateTime.of(2026, 7, 6, 0, 0), LocalDateTime.of(2026, 7, 7, 0, 0));
+        when(roundRepository.findTopByOrderByRoundDateDesc()).thenReturn(Optional.of(latestRound));
+        when(topicRepository.findByWeekOrder(4)).thenReturn(Optional.of(new Topic("4주차_주제", 4)));
+
+        PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
+                .aggregateStats(1L, Period.WEEKLY);
+
+        assertThat(stats.nextTopic()).isEqualTo("4주차_주제");
+    }
+
+    @Test
+    void 팔주차_다음은_일주차로_순환하여_다음_주제를_조회한다() {
+        SubmissionRepository submissionRepository = mock(SubmissionRepository.class);
+        RoundRepository roundRepository = mock(RoundRepository.class);
+        TopicRepository topicRepository = mock(TopicRepository.class);
+        stubEmptyAggregates(submissionRepository);
+        Topic currentTopic = new Topic("8주차_주제", 8);
+        Round latestRound = new Round(currentTopic, LocalDate.of(2026, 7, 6),
+                LocalDateTime.of(2026, 7, 6, 0, 0), LocalDateTime.of(2026, 7, 7, 0, 0));
+        when(roundRepository.findTopByOrderByRoundDateDesc()).thenReturn(Optional.of(latestRound));
+        when(topicRepository.findByWeekOrder(1)).thenReturn(Optional.of(new Topic("1주차_주제", 1)));
+
+        PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
+                .aggregateStats(1L, Period.WEEKLY);
+
+        assertThat(stats.nextTopic()).isEqualTo("1주차_주제");
+        verify(topicRepository).findByWeekOrder(1);
+        verify(topicRepository, never()).findByWeekOrder(9);
     }
 }
