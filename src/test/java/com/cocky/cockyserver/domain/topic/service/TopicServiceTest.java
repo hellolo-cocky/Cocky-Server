@@ -47,7 +47,7 @@ class TopicServiceTest {
 
         TopicResponse response = topicService.getCurrentTopic();
 
-        assertEquals(3, response.week());
+        assertEquals(3, response.topicOrder());
         assertEquals("배열", response.topic());
     }
 
@@ -60,7 +60,7 @@ class TopicServiceTest {
 
         TopicResponse response = topicService.getCurrentTopic();
 
-        assertEquals(5, response.week());
+        assertEquals(5, response.topicOrder());
         assertEquals("그래프", response.topic());
     }
 
@@ -83,12 +83,12 @@ class TopicServiceTest {
 
         TopicResponse response = topicService.getNextTopic();
 
-        assertEquals(4, response.week());
+        assertEquals(4, response.topicOrder());
         assertEquals("그래프", response.topic());
     }
 
     @Test
-    void nextTopic_cyclesFromWeek8ToWeek1() {
+    void nextTopic_cyclesFromTopicOrder8To1() {
         topicService = new TopicService(roundService, roundRepository, topicRepository);
         Topic current = new Topic("마무리", 8);
         Topic first = new Topic("구현", 1);
@@ -97,7 +97,7 @@ class TopicServiceTest {
 
         TopicResponse response = topicService.getNextTopic();
 
-        assertEquals(1, response.week());
+        assertEquals(1, response.topicOrder());
         assertEquals("구현", response.topic());
     }
 
