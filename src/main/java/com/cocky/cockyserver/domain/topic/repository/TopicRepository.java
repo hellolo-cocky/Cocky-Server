@@ -6,5 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TopicRepository extends JpaRepository<Topic, Long> {
 
-    Optional<Topic> findByWeekOrder(int weekOrder);
+    Optional<Topic> findByTopicOrder(int topicOrder);
 }

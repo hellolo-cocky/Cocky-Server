@@ -6,7 +6,7 @@ import java.util.Map;
 /**
  * 임시 초안 — 팀 검토 필요.
  *
- * <p>주간 주제(topic.name)별 회차 세부 유형(roundSubtype) 후보 목록. 스케줄러가
+ * <p>주제(topic.name)별 회차 세부 유형(roundSubtype) 후보 목록. 스케줄러가
  * 매일 이 목록에서 최근 출제와 안 겹치는 것 하나를 골라 AI 생성 요청에 넘긴다.
  */
 public final class RoundSubtypes {
