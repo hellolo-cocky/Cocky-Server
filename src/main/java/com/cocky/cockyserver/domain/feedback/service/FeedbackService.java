@@ -53,7 +53,8 @@ public class FeedbackService {
 
     /** {@link PeriodFeedbackProvider#summarize} 호출에 필요한 4개 필드를 DB에서 집계한다. */
     public PeriodStats aggregateStats(Long userId, Period period) {
-        Optional<PeriodWindow> window = resolveWindow(period, LocalDateTime.now(clock));
+        LocalDateTime now = LocalDateTime.now(clock);
+        Optional<PeriodWindow> window = resolveWindow(period, now);
         if (window.isEmpty()) {
             // ROUND인데 아직 마감된 회차가 하나도 없는 경우(서비스 극초반) — 빈 통계로 응답한다.
             return new PeriodStats(Map.of(), Map.of(), Map.of(), null);
@@ -74,7 +75,7 @@ public class FeedbackService {
         submissionRepository.aggregateWrongVerdictCountsByUserAndPeriod(userId, start, end)
                 .forEach(row -> wrongTypeCounts.put(row.getVerdict().name(), row.getCount().intValue()));
 
-        String nextTopic = resolveNextTopic(period);
+        String nextTopic = resolveNextTopic(period, now);
 
         return new PeriodStats(languageCounts, difficultyCounts, wrongTypeCounts, nextTopic);
     }
@@ -111,15 +112,21 @@ public class FeedbackService {
 
     /**
      * 다음 기간 대주제. ROUND는 예습 추천이 없어(Period 문서 참고) null로 비워 불필요한 조회를
-     * 생략한다. WEEKLY/MONTHLY는 가장 최근 라운드의 주제 weekOrder를 기준으로
+     * 생략한다. WEEKLY/MONTHLY는 가장 최근에 "마감된" 라운드의 주제 weekOrder를 기준으로
      * {@link TopicRotationPolicy#next}(회차 스케줄러와 공유하는 도메인 규칙)로 다음 주차를 구한 뒤
-     * topic 이름을 찾는다 — RoundSchedulerService가 다음 회차를 계획할 때 쓰는 것과 같은 규칙이다.
+     * topic 이름을 찾는다.
+     *
+     * <p>{@code findTopByOrderByRoundDateDesc}(마감 여부 무관, 단순 최신)가 아니라
+     * {@code findTopByCloseAtLessThanEqualOrderByCloseAtDesc}를 쓴다 — {@code resolveWindow}의
+     * ROUND 분기, 랭킹 배치와 같은 기준이다. {@code RoundSchedulerService}가 23시에 익일 라운드를
+     * {@code active=true}로 미리 만들어 두므로, 마감 여부를 안 보면 23시 이후엔 아직 시작도
+     * 안 한 다음 라운드가 "최신"으로 잡혀 다음 주제가 한 주 더 밀리는 버그가 있었다.
      */
-    private String resolveNextTopic(Period period) {
+    private String resolveNextTopic(Period period, LocalDateTime now) {
         if (period == Period.ROUND) {
             return null;
         }
-        return roundRepository.findTopByOrderByRoundDateDesc()
+        return roundRepository.findTopByCloseAtLessThanEqualOrderByCloseAtDesc(now)
                 .map(latest -> TopicRotationPolicy.next(latest.getTopic().getWeekOrder()))
                 .flatMap(topicRepository::findByWeekOrder)
                 .map(Topic::getName)
