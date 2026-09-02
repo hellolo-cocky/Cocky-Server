@@ -6,6 +6,7 @@ import com.cocky.cockyserver.ai.dto.Period;
 import com.cocky.cockyserver.ai.dto.PeriodFeedback;
 import com.cocky.cockyserver.ai.dto.PeriodStats;
 import com.cocky.cockyserver.ai.port.PeriodFeedbackProvider;
+import com.cocky.cockyserver.domain.feedback.dto.PeriodFeedbackResult;
 import com.cocky.cockyserver.domain.round.TopicRotationPolicy;
 import com.cocky.cockyserver.domain.round.repository.RoundRepository;
 import com.cocky.cockyserver.domain.submission.repository.SubmissionRepository;
@@ -47,8 +48,19 @@ public class FeedbackService {
 
     /** {@link PeriodStats}를 집계해 AI 포트에 넘기고 총평을 받아온다 — 이 메서드가 조립 진입점이다. */
     public PeriodFeedback getPeriodicFeedback(Long userId, Period period) {
+        return getPeriodicFeedbackWithStats(userId, period).feedback();
+    }
+
+    /**
+     * {@link #getPeriodicFeedback}과 같은 일을 하되 집계에 쓴 {@link PeriodStats}도 함께 반환한다.
+     * 컨트롤러가 응답에 languageStats/difficultyStats처럼 집계 원본까지 담아야 할 때 이 메서드를
+     * 쓴다 — {@code aggregateStats}를 따로 한 번 더 부르면 집계 쿼리 3종이 두 번 도는 걸 피하기
+     * 위함이다.
+     */
+    public PeriodFeedbackResult getPeriodicFeedbackWithStats(Long userId, Period period) {
         PeriodStats stats = aggregateStats(userId, period);
-        return periodFeedbackProvider.summarize(period, stats);
+        PeriodFeedback feedback = periodFeedbackProvider.summarize(period, stats);
+        return new PeriodFeedbackResult(stats, feedback);
     }
 
     /** {@link PeriodFeedbackProvider#summarize} 호출에 필요한 4개 필드를 DB에서 집계한다. */
