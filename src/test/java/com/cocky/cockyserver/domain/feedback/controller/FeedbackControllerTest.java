@@ -31,11 +31,8 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 /**
- * GET /api/v1/feedback/periodic 슬라이스 테스트. spring-security-test가 의존성에 없어서
- * (build.gradle 확인됨) {@code @WebMvcTest}+Spring Security 필터 체인 대신, standalone MockMvc +
- * 커스텀 {@link HandlerMethodArgumentResolver}로 {@code @AuthenticationPrincipal UserPrincipal}만
- * 흉내 낸다. {@link GlobalExceptionHandler}는 실제 빈을 그대로 등록해서 잘못된 period 값이
- * 정말 400으로 떨어지는지까지 확인한다.
+ * GET /api/v1/feedback/periodic 슬라이스 테스트. spring-security-test 의존성이 없어 standalone
+ * MockMvc + 커스텀 {@link HandlerMethodArgumentResolver}로 {@code @AuthenticationPrincipal}을 흉내 낸다.
  */
 class FeedbackControllerTest {
 
@@ -129,12 +126,7 @@ class FeedbackControllerTest {
                 .andExpect(jsonPath("$.wrongTypeStats").value(aMapWithSize(0)));
     }
 
-    /**
-     * period가 Period enum(ROUND/WEEKLY/MONTHLY) 값이 아니면 Spring이 바인딩 단계에서
-     * MethodArgumentTypeMismatchException을 던지고, GlobalExceptionHandler가 이미
-     * "language/difficulty/sort 등 @RequestParam enum 값" 공통 케이스로 400 INVALID_REQUEST를
-     * 내려주고 있다 — 이 엔드포인트도 같은 공용 핸들러를 자연히 탄다.
-     */
+    // GlobalExceptionHandler의 공용 enum 바인딩 실패 처리를 그대로 탄다.
     @Test
     void 잘못된_period_값이면_400_INVALID_REQUEST가_내려온다() throws Exception {
         mockMvc.perform(get("/api/v1/feedback/periodic").param("period", "TWO_DAY"))
