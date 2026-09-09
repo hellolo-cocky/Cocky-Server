@@ -190,7 +190,7 @@ class FeedbackServiceTest {
                 .aggregateStats(1L, Period.WEEKLY);
 
         assertThat(stats.languageCounts()).containsExactlyInAnyOrderEntriesOf(
-                Map.of(Language.PYTHON, 3, Language.C, 1, Language.JAVA, 2));
+                Map.of(Language.PYTHON, 3L, Language.C, 1L, Language.JAVA, 2L));
     }
 
     @Test
@@ -211,7 +211,7 @@ class FeedbackServiceTest {
                 .aggregateStats(1L, Period.WEEKLY);
 
         assertThat(stats.difficultyCounts()).containsExactlyInAnyOrderEntriesOf(
-                Map.of(Difficulty.EASY, 4, Difficulty.NORMAL, 5, Difficulty.HARD, 1));
+                Map.of(Difficulty.EASY, 4L, Difficulty.NORMAL, 5L, Difficulty.HARD, 1L));
     }
 
     @Test
@@ -228,7 +228,7 @@ class FeedbackServiceTest {
         PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
                 .aggregateStats(1L, Period.WEEKLY);
 
-        assertThat(stats.wrongTypeCounts()).containsExactlyInAnyOrderEntriesOf(Map.of("WA", 2, "TLE", 1));
+        assertThat(stats.wrongTypeCounts()).containsExactlyInAnyOrderEntriesOf(Map.of("WA", 2L, "TLE", 1L));
     }
 
     @Test

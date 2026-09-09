@@ -64,7 +64,7 @@ class DemoFlowTest {
     @Test
     void roundFeedbackHasNoRecommendButWeeklyDoes() {
         var pf = new DemoPeriodFeedback();
-        var stats = new PeriodStats(Map.of(Language.PYTHON, 5), Map.of(Difficulty.EASY, 3), Map.of(), "그래프 탐색");
+        var stats = new PeriodStats(Map.of(Language.PYTHON, 5L), Map.of(Difficulty.EASY, 3L), Map.of(), "그래프 탐색");
 
         PeriodFeedback round = pf.summarize(Period.ROUND, stats);
         assertFalse(round.summary().isBlank());

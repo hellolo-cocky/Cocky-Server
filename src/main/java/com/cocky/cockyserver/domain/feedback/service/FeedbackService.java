@@ -75,17 +75,17 @@ public class FeedbackService {
         LocalDateTime start = window.get().start();
         LocalDateTime end = window.get().end();
 
-        Map<Language, Integer> languageCounts = new EnumMap<>(Language.class);
+        Map<Language, Long> languageCounts = new EnumMap<>(Language.class);
         submissionRepository.aggregateLanguageCountsByUserAndPeriod(userId, start, end)
-                .forEach(row -> languageCounts.put(toAiLanguage(row.getLanguage()), row.getCount().intValue()));
+                .forEach(row -> languageCounts.put(toAiLanguage(row.getLanguage()), row.getCount()));
 
-        Map<Difficulty, Integer> difficultyCounts = new EnumMap<>(Difficulty.class);
+        Map<Difficulty, Long> difficultyCounts = new EnumMap<>(Difficulty.class);
         submissionRepository.aggregateDifficultyCountsByUserAndPeriod(userId, start, end)
-                .forEach(row -> difficultyCounts.put(toAiDifficulty(row.getDifficulty()), row.getCount().intValue()));
+                .forEach(row -> difficultyCounts.put(toAiDifficulty(row.getDifficulty()), row.getCount()));
 
-        Map<String, Integer> wrongTypeCounts = new LinkedHashMap<>();
+        Map<String, Long> wrongTypeCounts = new LinkedHashMap<>();
         submissionRepository.aggregateWrongVerdictCountsByUserAndPeriod(userId, start, end)
-                .forEach(row -> wrongTypeCounts.put(row.getVerdict().name(), row.getCount().intValue()));
+                .forEach(row -> wrongTypeCounts.put(row.getVerdict().name(), row.getCount()));
 
         String nextTopic = resolveNextTopic(period, now);
 

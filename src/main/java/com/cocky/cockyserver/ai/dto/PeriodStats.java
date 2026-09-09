@@ -11,9 +11,9 @@ import java.util.Map;
  * @param nextTopic        다음 기간 대주제(주간/월간 예습 추천용, null 가능).
  */
 public record PeriodStats(
-        Map<Language, Integer> languageCounts,
-        Map<Difficulty, Integer> difficultyCounts,
-        Map<String, Integer> wrongTypeCounts,
+        Map<Language, Long> languageCounts,
+        Map<Difficulty, Long> difficultyCounts,
+        Map<String, Long> wrongTypeCounts,
         String nextTopic
 ) {
 }

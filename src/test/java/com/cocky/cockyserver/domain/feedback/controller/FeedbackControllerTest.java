@@ -51,17 +51,17 @@ class FeedbackControllerTest {
                 .build();
     }
 
-    private PeriodStats stats(Map<Language, Integer> languageCounts, Map<Difficulty, Integer> difficultyCounts,
-                               Map<String, Integer> wrongTypeCounts, String nextTopic) {
+    private PeriodStats stats(Map<Language, Long> languageCounts, Map<Difficulty, Long> difficultyCounts,
+                               Map<String, Long> wrongTypeCounts, String nextTopic) {
         return new PeriodStats(languageCounts, difficultyCounts, wrongTypeCounts, nextTopic);
     }
 
     @Test
     void ROUND_요청시_200과_응답_필드가_정상_직렬화되고_studyRecommend는_null이다() throws Exception {
         PeriodStats stats = stats(
-                Map.of(Language.PYTHON, 3, Language.C, 1, Language.JAVA, 2),
-                Map.of(Difficulty.EASY, 2, Difficulty.NORMAL, 3, Difficulty.HARD, 1),
-                Map.of("WA", 2, "TLE", 1),
+                Map.of(Language.PYTHON, 3L, Language.C, 1L, Language.JAVA, 2L),
+                Map.of(Difficulty.EASY, 2L, Difficulty.NORMAL, 3L, Difficulty.HARD, 1L),
+                Map.of("WA", 2L, "TLE", 1L),
                 null);
         PeriodFeedback feedback = new PeriodFeedback(Period.ROUND, "이번 회차 총평", null);
         when(feedbackService.getPeriodicFeedbackWithStats(eq(USER_ID), eq(Period.ROUND)))
@@ -84,8 +84,8 @@ class FeedbackControllerTest {
 
     @Test
     void WEEKLY_요청시_200과_studyRecommend가_함께_내려온다() throws Exception {
-        PeriodStats stats = stats(Map.of(Language.PYTHON, 5), Map.of(Difficulty.NORMAL, 5),
-                Map.of("WA", 1), "4주차_주제");
+        PeriodStats stats = stats(Map.of(Language.PYTHON, 5L), Map.of(Difficulty.NORMAL, 5L),
+                Map.of("WA", 1L), "4주차_주제");
         PeriodFeedback feedback = new PeriodFeedback(Period.WEEKLY, "이번 주 총평", "4주차_주제 예습 추천");
         when(feedbackService.getPeriodicFeedbackWithStats(eq(USER_ID), eq(Period.WEEKLY)))
                 .thenReturn(new PeriodFeedbackResult(stats, feedback));
@@ -99,8 +99,8 @@ class FeedbackControllerTest {
 
     @Test
     void MONTHLY_요청시_200과_studyRecommend가_함께_내려온다() throws Exception {
-        PeriodStats stats = stats(Map.of(Language.JAVA, 10), Map.of(Difficulty.HARD, 10),
-                Map.of("RE", 3), "5주차_주제");
+        PeriodStats stats = stats(Map.of(Language.JAVA, 10L), Map.of(Difficulty.HARD, 10L),
+                Map.of("RE", 3L), "5주차_주제");
         PeriodFeedback feedback = new PeriodFeedback(Period.MONTHLY, "이번 달 총평", "5주차_주제 예습 추천");
         when(feedbackService.getPeriodicFeedbackWithStats(eq(USER_ID), eq(Period.MONTHLY)))
                 .thenReturn(new PeriodFeedbackResult(stats, feedback));

@@ -15,9 +15,9 @@ import java.util.Map;
  */
 public record PeriodFeedbackResponse(
         Period period,
-        Map<String, Integer> languageStats,
-        Map<String, Integer> difficultyStats,
-        Map<String, Integer> wrongTypeStats,
+        Map<String, Long> languageStats,
+        Map<String, Long> difficultyStats,
+        Map<String, Long> wrongTypeStats,
         String aiSummary,
         String studyRecommend
 ) {
@@ -32,8 +32,8 @@ public record PeriodFeedbackResponse(
                 result.feedback().studyRecommend());
     }
 
-    private static <E extends Enum<E>> Map<String, Integer> toStringKeyMap(Map<E, Integer> source) {
-        Map<String, Integer> result = new LinkedHashMap<>();
+    private static <E extends Enum<E>> Map<String, Long> toStringKeyMap(Map<E, Long> source) {
+        Map<String, Long> result = new LinkedHashMap<>();
         source.forEach((key, value) -> result.put(key.name(), value));
         return result;
     }
