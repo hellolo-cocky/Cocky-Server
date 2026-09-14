@@ -1,5 +1,6 @@
 package com.cocky.cockyserver.global.exception;
 
+import com.cocky.cockyserver.ai.port.PeriodFeedbackFailedException;
 import com.cocky.cockyserver.domain.auth.exception.OAuthCodeInvalidException;
 import com.cocky.cockyserver.domain.auth.exception.OAuthServerException;
 import com.cocky.cockyserver.domain.auth.exception.RefreshTokenExpiredException;
@@ -98,6 +99,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleJudgeExecutionFailed(JudgeExecutionException e) {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                 .body(new ErrorResponse("JUDGE_EXECUTION_FAILED", e.getMessage()));
+    }
+
+    /** ai.port.PeriodFeedbackProvider#summarize 실패(OpenAI 호출/파싱/빈 응답) — 단계 2. */
+    @ExceptionHandler(PeriodFeedbackFailedException.class)
+    public ResponseEntity<ErrorResponse> handlePeriodFeedbackFailed(PeriodFeedbackFailedException e) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ErrorResponse("PERIOD_FEEDBACK_FAILED", e.getMessage()));
     }
 
     @ExceptionHandler(TestCaseNotConfiguredException.class)
