@@ -79,14 +79,17 @@ public class FeedbackService {
         LocalDateTime end = window.get().end();
 
         Map<Language, Integer> languageCounts = new EnumMap<>(Language.class);
+        // intValue(): 리포지토리 count 결과(Long)를 PeriodStats 레코드 타입(Integer)에 맞추는 정상 변환.
         submissionRepository.aggregateLanguageCountsByUserAndPeriod(userId, start, end)
                 .forEach(row -> languageCounts.put(toAiLanguage(row.getLanguage()), row.getCount().intValue()));
 
         Map<Difficulty, Integer> difficultyCounts = new EnumMap<>(Difficulty.class);
+        // intValue(): 위와 동일 — count(Long) → PeriodStats 필드 타입(Integer) 변환.
         submissionRepository.aggregateDifficultyCountsByUserAndPeriod(userId, start, end)
                 .forEach(row -> difficultyCounts.put(toAiDifficulty(row.getDifficulty()), row.getCount().intValue()));
 
         Map<String, Integer> wrongTypeCounts = new LinkedHashMap<>();
+        // intValue(): 위와 동일 — count(Long) → PeriodStats 필드 타입(Integer) 변환.
         submissionRepository.aggregateWrongVerdictCountsByUserAndPeriod(userId, start, end)
                 .forEach(row -> wrongTypeCounts.put(row.getVerdict().name(), row.getCount().intValue()));
 
