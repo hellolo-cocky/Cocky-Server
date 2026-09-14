@@ -40,19 +40,20 @@ public class InstantFeedbackService implements InstantFeedbackProvider {
     }
 
     /**
-     * 계약: 재시도(모듈 내부, {@code ai.instant-feedback.max-retries} — 문제 생성 경로와
-     * 별개 설정, 기본 1회) 소진 시 {@link InstantFeedbackFailedException}만 port 밖으로 나간다.
+     * 계약: 총 시도({@code ai.instant-feedback.max-attempts} — 문제 생성 경로와 별개 설정,
+     * 기본 1회) 소진 시 {@link InstantFeedbackFailedException}만 port 밖으로 나간다.
      * OpenAiException 등 내부 예외는 여기서 흡수한다.
      *
-     * <p>제출 API가 동기로 기다리는 경로라 타임아웃(기본 10s)·재시도 횟수 둘 다 문제 생성보다
+     * <p>제출 API가 동기로 기다리는 경로라 타임아웃(기본 10s)·시도 횟수 둘 다 문제 생성보다
      * 짧게 잡는다 — {@code OpenAiClient} 생성 지점(AiConfig)에서 이미 짧은 타임아웃으로 만들어진
      * 인스턴스를 주입받는다(단계 1).
      */
     @Override
     public InstantFeedback evaluate(Submission submission) {
-        int maxRetries = props.instantFeedback().maxRetries();
+        int maxAttempts = props.instantFeedback().maxAttempts();
         RuntimeException last = null;
-        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+        // maxAttempts는 재시도 횟수가 아니라 총 시도 횟수다 (1이면 단발 호출)
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 return evaluateOnce(submission);
             } catch (RuntimeException e) {
@@ -60,10 +61,10 @@ public class InstantFeedbackService implements InstantFeedbackProvider {
                 log.warn("즉시 피드백 시도 {} 실패: {}", attempt, e.getMessage());
             }
         }
-        log.error("즉시 피드백 재시도 {}회 소진: {}", maxRetries,
+        log.error("즉시 피드백 총 {}회 시도 모두 실패: {}", maxAttempts,
                 last == null ? "알 수 없음" : last.getMessage());
         throw new InstantFeedbackFailedException(
-                "즉시 피드백 생성 실패(재시도 " + maxRetries + "회 소진)", last);
+                "즉시 피드백 생성 실패(총 " + maxAttempts + "회 시도 소진)", last);
     }
 
     private InstantFeedback evaluateOnce(Submission submission) {

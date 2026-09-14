@@ -66,10 +66,11 @@ public class ProblemGeneratorService implements ProblemGenerator {
      */
     private GenerationItem generateOne(GenerationRequest req, Language lang, Difficulty diff,
                                        List<String> seenStatements) {
-        int maxRetries = props.generation().maxRetries();
+        int maxAttempts = props.generation().maxAttempts();
         String lastReason = "알 수 없음";
         Parsed lastFailed = null;
-        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+        // maxAttempts는 재시도 횟수가 아니라 총 시도 횟수다 (1이면 단발 호출)
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 // 재시도면 직전 실패 사유를 프롬프트에 붙여 같은 실수 재생산을 막는다.
                 String feedback = attempt == 1 ? null : lastReason;
@@ -111,14 +112,14 @@ public class ProblemGeneratorService implements ProblemGenerator {
                 log.warn("[{}/{}] 생성 시도 {} 실패: {}", lang, diff, attempt, e.getMessage());
             }
         }
-        log.error("[{}/{}] 재시도 {}회 소진 — 실패 조합으로 보고(성공분 보존): {}",
-                lang, diff, maxRetries, lastReason);
+        log.error("[{}/{}] 총 {}회 시도 소진 — 실패 조합으로 보고(성공분 보존): {}",
+                lang, diff, maxAttempts, lastReason);
         if (lastFailed != null) {
             // 사후 분석용 — 실패 문제의 지문이 없으면 불일치 원인 역추정이 안 된다.
             log.error("[{}/{}] 마지막 실패 문제: 제목=[{}] 지문=[{}]",
                     lang, diff, lastFailed.title, abbreviate(lastFailed.statement, 400));
         }
-        return GenerationItem.failure(lang, diff, maxRetries, lastReason);
+        return GenerationItem.failure(lang, diff, maxAttempts, lastReason);
     }
 
     /** 각 예제 input으로 정답 코드를 실행해 declared output과 일치하면 실행 출력으로 확정. */
