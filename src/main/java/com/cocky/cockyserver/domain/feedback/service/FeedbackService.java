@@ -29,12 +29,15 @@ import org.springframework.stereotype.Service;
  * {@link PeriodFeedbackProvider}(ai.port)에만 넘긴다 — ai.service/ai.demo 구현체는 AiConfig가
  * 빈으로 무엇을 주입했는지에 따라 갈리므로 이 클래스는 절대 알 필요가 없다.
  *
- * <p>⚠️ 채점 아키텍처와 마찬가지로 AI 모듈도 포트 인터페이스 뒤로 숨기는 원칙이 있다
- * (CLAUDE.md 8.5절과 같은 취지). {@link PeriodFeedbackProvider}는
- * {@link com.cocky.cockyserver.ai.port.InstantFeedbackFailedException}같은 전용 실패 계약
- * 예외가 아직 없다 — summarize()가 내부적으로 IllegalStateException을 던질 수 있는데(JSON
- * 파싱 실패 등), 지금은 그 예외를 여기서 캐치하지 않고 그대로 흘려보낸다. 즉시 피드백 쪽처럼
- * "실패해도 나머지는 저장" 폴백이 필요하면 ai.port에 전용 예외를 먼저 추가해야 한다.
+ * <p>채점 아키텍처와 마찬가지로 AI 모듈도 포트 인터페이스 뒤로 숨기는 원칙이 있다
+ * (CLAUDE.md 8.5절과 같은 취지). {@link PeriodFeedbackProvider#summarize}가 실패하면
+ * {@link com.cocky.cockyserver.ai.port.PeriodFeedbackFailedException}만 나간다(단계 2) —
+ * 즉시 피드백의 {@link com.cocky.cockyserver.ai.port.InstantFeedbackFailedException}과 같은
+ * 패턴이지만, 재시도 루프는 없다(단발 호출 실패 시 바로 던짐 — periodic은 호출 빈도가 낮아
+ * 재시도 도입 여부는 별도 판단이 필요해 보류 중). 이 클래스는 그 예외를 캐치하지 않고 그대로
+ * 흘려보내며, {@code GlobalExceptionHandler}가 503(PERIOD_FEEDBACK_FAILED)으로 변환한다.
+ * 즉시 피드백 쪽처럼 "실패해도 나머지는 저장" 폴백이 필요해지면 여기서 캐치해 흡수하도록
+ * 바꾸면 된다.
  */
 @Service
 @RequiredArgsConstructor

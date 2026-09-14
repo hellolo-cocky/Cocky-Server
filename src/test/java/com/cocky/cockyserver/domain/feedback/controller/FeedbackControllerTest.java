@@ -14,6 +14,7 @@ import com.cocky.cockyserver.ai.dto.Language;
 import com.cocky.cockyserver.ai.dto.Period;
 import com.cocky.cockyserver.ai.dto.PeriodFeedback;
 import com.cocky.cockyserver.ai.dto.PeriodStats;
+import com.cocky.cockyserver.ai.port.PeriodFeedbackFailedException;
 import com.cocky.cockyserver.domain.feedback.dto.PeriodFeedbackResult;
 import com.cocky.cockyserver.domain.feedback.service.FeedbackService;
 import com.cocky.cockyserver.domain.user.entity.Role;
@@ -138,6 +139,19 @@ class FeedbackControllerTest {
     void period_파라미터가_없으면_400이_내려온다() throws Exception {
         mockMvc.perform(get("/api/v1/feedback/periodic"))
                 .andExpect(status().isBadRequest());
+    }
+
+    // 단계 2: PeriodFeedbackProvider.summarize() 실패(OpenAI 호출/파싱/빈 응답)가
+    // PeriodFeedbackFailedException으로 올라오면 500 스택트레이스 대신 503으로 응답해야 한다.
+    @Test
+    void 기간_피드백_생성에_실패하면_503_PERIOD_FEEDBACK_FAILED가_내려온다() throws Exception {
+        when(feedbackService.getPeriodicFeedbackWithStats(eq(USER_ID), eq(Period.ROUND)))
+                .thenThrow(new PeriodFeedbackFailedException(
+                        "기간 피드백 생성 실패: OpenAI 호출 실패", new RuntimeException("타임아웃")));
+
+        mockMvc.perform(get("/api/v1/feedback/periodic").param("period", "ROUND"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("PERIOD_FEEDBACK_FAILED"));
     }
 
     private static class UserPrincipalArgumentResolver implements HandlerMethodArgumentResolver {
