@@ -70,5 +70,10 @@ ai:
   exec:
     timeout-ms: 5000
   generation:
-    max-retries: 3
+    max-attempts: 3
     similarity-threshold: 0.80
+  # 즉시 피드백은 제출 API에서 동기로 기다리는 경로라 문제 생성(60000ms/3회)보다 짧게 잡는다.
+  # max-attempts는 재시도 횟수가 아니라 총 시도 횟수다(1이면 단발 호출).
+  instant-feedback:
+    timeout-ms: 10000
+    max-attempts: 1

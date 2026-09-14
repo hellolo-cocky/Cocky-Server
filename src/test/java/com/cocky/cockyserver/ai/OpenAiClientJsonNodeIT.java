@@ -51,7 +51,7 @@ class OpenAiClientJsonNodeIT {
         String baseUrl = "http://127.0.0.1:" + server.getAddress().getPort();
         AiProperties props = new AiProperties(
                 new AiProperties.OpenAi("test-key", baseUrl, 5000),
-                null, null, null, null);
+                null, null, null, null, null);
         OpenAiClient client = new OpenAiClient(props, new ObjectMapper());
 
         String content = client.chatText("gpt-5.4-nano", "system", "user");

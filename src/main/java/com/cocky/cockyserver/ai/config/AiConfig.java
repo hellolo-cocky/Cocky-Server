@@ -60,10 +60,19 @@ public class AiConfig {
         return new ProblemGeneratorService(openAi, executor, similarity, props);
     }
 
+    /**
+     * 즉시 피드백은 공유 {@code openAiClient} 빈(생성용 60s/3회 기준 타임아웃)을 쓰지 않고
+     * {@code ai.instant-feedback.timeout-ms}로 만든 전용 {@link OpenAiClient} 인스턴스를 쓴다.
+     * {@link org.springframework.http.client.SimpleClientHttpRequestFactory}가 인스턴스별 고정
+     * 타임아웃이라 빈을 공유하면 목적별 타임아웃 분리가 불가능하기 때문(단계 1) — 이 메서드
+     * 안에서만 만들고 별도 빈으로 노출하지 않아 다른 곳에서 실수로 재사용되는 것도 막는다.
+     */
     @Bean
     @ConditionalOnExpression(REAL)
-    public InstantFeedbackProvider instantFeedbackProvider(OpenAiClient openAi, AiProperties props) {
-        return new InstantFeedbackService(openAi, props);
+    public InstantFeedbackProvider instantFeedbackProvider(AiProperties props, ObjectMapper objectMapper) {
+        OpenAiClient instantFeedbackOpenAiClient = new OpenAiClient(
+                props, objectMapper, props.instantFeedback().timeoutMs());
+        return new InstantFeedbackService(instantFeedbackOpenAiClient, props);
     }
 
     @Bean

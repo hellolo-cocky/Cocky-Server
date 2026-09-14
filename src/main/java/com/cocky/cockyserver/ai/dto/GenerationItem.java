@@ -7,7 +7,7 @@ package com.cocky.cockyserver.ai.dto;
  * @param language   대상 언어.
  * @param difficulty 난이도.
  * @param problem    생성된 문제(실패 시 null).
- * @param attempts   소요 시도 횟수(1~maxRetries).
+ * @param attempts   소요 시도 횟수(1~maxAttempts).
  * @param failReason 실패 사유(성공 시 null).
  */
 public record GenerationItem(

@@ -28,7 +28,7 @@ class AiWiringTest {
                     "ai.openai.base-url=https://api.openai.com/v1",
                     "ai.openai.timeout-ms=1000",
                     "ai.exec.timeout-ms=5000",
-                    "ai.generation.max-retries=3",
+                    "ai.generation.max-attempts=3",
                     "ai.generation.similarity-threshold=0.8");
 
     @Test

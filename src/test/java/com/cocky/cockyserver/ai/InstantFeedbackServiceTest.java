@@ -28,7 +28,8 @@ class InstantFeedbackServiceTest {
             ],"personality":"차분한 분석가"}
             """;
 
-    private final AiProperties props = new AiProperties(null, null, null, null, null);
+    /** 기본값(instantFeedback.maxAttempts=1)을 그대로 쓴다 — 실제 운영 설정과 동일 경로 검증. */
+    private final AiProperties props = new AiProperties(null, null, null, null, null, null);
 
     private Submission submission() {
         return new Submission(Language.JAVA, Difficulty.EASY, "문제", "코드");
@@ -69,11 +70,15 @@ class InstantFeedbackServiceTest {
 
     @Test
     void retriesThenSucceeds() {
-        ScriptedOpenAiClient client = new ScriptedOpenAiClient(props,
+        // 재시도 자체가 동작하는지 보려는 테스트라 기본값(maxAttempts=1)으로는 검증이 안 된다 —
+        // instantFeedback.maxAttempts만 3으로 올린 전용 props를 쓴다.
+        AiProperties retryProps = new AiProperties(null, null, null, null, null,
+                new AiProperties.InstantFeedback(10_000, 3));
+        ScriptedOpenAiClient client = new ScriptedOpenAiClient(retryProps,
                 new OpenAiException("타임아웃"),
                 new OpenAiException("429"),
                 VALID_JSON);
-        InstantFeedback fb = new InstantFeedbackService(client, props).evaluate(submission());
+        InstantFeedback fb = new InstantFeedbackService(client, retryProps).evaluate(submission());
         assertEquals(3, fb.items().size());
         assertEquals(3, client.calls());
     }
@@ -85,7 +90,7 @@ class InstantFeedbackServiceTest {
         InstantFeedbackFailedException ex = assertThrows(InstantFeedbackFailedException.class,
                 () -> new InstantFeedbackService(client, props).evaluate(submission()));
         assertInstanceOf(OpenAiException.class, ex.getCause());
-        assertEquals(props.generation().maxRetries(), client.calls());
+        assertEquals(props.instantFeedback().maxAttempts(), client.calls());
     }
 
     @Test
@@ -94,7 +99,7 @@ class InstantFeedbackServiceTest {
                 "{\"items\":[{\"category\":\"시간복잡도 효율\",\"score\":\"5\",\"comment\":\"x\"}],\"personality\":\"p\"}");
         assertThrows(InstantFeedbackFailedException.class,
                 () -> new InstantFeedbackService(client, props).evaluate(submission()));
-        assertEquals(props.generation().maxRetries(), client.calls());
+        assertEquals(props.instantFeedback().maxAttempts(), client.calls());
     }
 
     @Test
@@ -103,7 +108,7 @@ class InstantFeedbackServiceTest {
         ScriptedOpenAiClient client = new ScriptedOpenAiClient(props, json);
         assertThrows(InstantFeedbackFailedException.class,
                 () -> new InstantFeedbackService(client, props).evaluate(submission()));
-        assertEquals(props.generation().maxRetries(), client.calls());
+        assertEquals(props.instantFeedback().maxAttempts(), client.calls());
     }
 
     @Test
@@ -112,6 +117,6 @@ class InstantFeedbackServiceTest {
         ScriptedOpenAiClient client = new ScriptedOpenAiClient(props, json);
         assertThrows(InstantFeedbackFailedException.class,
                 () -> new InstantFeedbackService(client, props).evaluate(submission()));
-        assertEquals(props.generation().maxRetries(), client.calls());
+        assertEquals(props.instantFeedback().maxAttempts(), client.calls());
     }
 }

@@ -24,6 +24,7 @@ class LocalProcessExecutorTest {
                 null,
                 "local",
                 new AiProperties.Exec(timeoutMs),
+                null,
                 null);
         return new LocalProcessExecutor(props);
     }
