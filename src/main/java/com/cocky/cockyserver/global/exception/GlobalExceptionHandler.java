@@ -1,5 +1,6 @@
 package com.cocky.cockyserver.global.exception;
 
+import com.cocky.cockyserver.ai.port.NicknameGenerationFailedException;
 import com.cocky.cockyserver.ai.port.PeriodFeedbackFailedException;
 import com.cocky.cockyserver.domain.auth.exception.OAuthCodeInvalidException;
 import com.cocky.cockyserver.domain.auth.exception.OAuthServerException;
@@ -106,6 +107,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handlePeriodFeedbackFailed(PeriodFeedbackFailedException e) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(new ErrorResponse("PERIOD_FEEDBACK_FAILED", e.getMessage()));
+    }
+
+    /** ai.port.NicknameGenerator#generate 실패(AI 호출/중복 5회 소진 통일) — 단계 3. */
+    @ExceptionHandler(NicknameGenerationFailedException.class)
+    public ResponseEntity<ErrorResponse> handleNicknameGenerationFailed(NicknameGenerationFailedException e) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ErrorResponse("NICKNAME_GENERATION_FAILED", e.getMessage()));
     }
 
     @ExceptionHandler(TestCaseNotConfiguredException.class)

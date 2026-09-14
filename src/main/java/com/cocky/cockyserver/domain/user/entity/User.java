@@ -56,6 +56,12 @@ public class User {
     @Column(name = "refresh_token", length = 512)
     private String refreshToken;
 
+    @Column(name = "anonymous_nickname", length = 50, unique = true)
+    private String anonymousNickname;
+
+    @Column(name = "is_anonymous", nullable = false)
+    private boolean anonymous;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -90,5 +96,14 @@ public class User {
 
     public void clearRefreshToken() {
         this.refreshToken = null;
+    }
+
+    /** anonymousNickname이 이미 있으면 재생성하지 않고 그대로 둔다 — 호출부는 null일 때만 넘긴다. */
+    public void updateAnonymousNickname(String anonymousNickname) {
+        this.anonymousNickname = anonymousNickname;
+    }
+
+    public void updateAnonymous(boolean anonymous) {
+        this.anonymous = anonymous;
     }
 }
