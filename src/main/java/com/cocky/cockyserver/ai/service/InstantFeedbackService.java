@@ -40,13 +40,17 @@ public class InstantFeedbackService implements InstantFeedbackProvider {
     }
 
     /**
-     * 계약: 재시도(모듈 내부, 생성 경로와 동일 횟수) 소진 시
-     * {@link InstantFeedbackFailedException}만 port 밖으로 나간다.
+     * 계약: 재시도(모듈 내부, {@code ai.instant-feedback.max-retries} — 문제 생성 경로와
+     * 별개 설정, 기본 1회) 소진 시 {@link InstantFeedbackFailedException}만 port 밖으로 나간다.
      * OpenAiException 등 내부 예외는 여기서 흡수한다.
+     *
+     * <p>제출 API가 동기로 기다리는 경로라 타임아웃(기본 10s)·재시도 횟수 둘 다 문제 생성보다
+     * 짧게 잡는다 — {@code OpenAiClient} 생성 지점(AiConfig)에서 이미 짧은 타임아웃으로 만들어진
+     * 인스턴스를 주입받는다(단계 1).
      */
     @Override
     public InstantFeedback evaluate(Submission submission) {
-        int maxRetries = props.generation().maxRetries();
+        int maxRetries = props.instantFeedback().maxRetries();
         RuntimeException last = null;
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {

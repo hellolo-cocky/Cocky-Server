@@ -32,7 +32,8 @@ class AiSmokeTest {
                 new AiProperties.Models(genModel, nanoModel, nanoModel, genModel, genModel),
                 "local",
                 new AiProperties.Exec(5000),
-                new AiProperties.Generation(3, 0.80));
+                new AiProperties.Generation(3, 0.80),
+                new AiProperties.InstantFeedback(10000, 1));
     }
 
     @Test

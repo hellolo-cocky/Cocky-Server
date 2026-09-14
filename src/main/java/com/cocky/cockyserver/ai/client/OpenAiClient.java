@@ -32,12 +32,25 @@ public class OpenAiClient {
      * Jackson 3 기반이라 classic {@link JsonNode} 응답을 파싱하지 못한다
      * ({@code InvalidDefinitionException: Type definition error} 발생) — {@code DataGsmOauthClient}와
      * 동일한 패턴.
+     *
+     * <p>타임아웃은 {@code props.openai().timeoutMs()}(생성용 기본값)를 쓴다. 호출 목적별로 다른
+     * 타임아웃이 필요하면(예: 즉시 피드백) {@link #OpenAiClient(AiProperties, ObjectMapper, long)}를 쓴다.
      */
     public OpenAiClient(AiProperties props, ObjectMapper objectMapper) {
+        this(props, objectMapper, props.openai().timeoutMs());
+    }
+
+    /**
+     * 호출 목적별로 connect/read 타임아웃을 달리 쓰고 싶을 때의 생성자(단계 1: 즉시 피드백 전용
+     * 타임아웃 분리). {@link SimpleClientHttpRequestFactory}는 인스턴스마다 타임아웃이 고정이라
+     * 요청 단위로 바꿀 수 없으므로, 목적별로 별도 {@code OpenAiClient} 인스턴스를 만드는 방식을
+     * 택했다 — baseUrl/apiKey는 여전히 {@code props.openai()}를 그대로 쓰고 timeoutMs만 override한다.
+     */
+    public OpenAiClient(AiProperties props, ObjectMapper objectMapper, long timeoutMs) {
         AiProperties.OpenAi cfg = props.openai();
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofMillis(cfg.timeoutMs()));
-        factory.setReadTimeout(Duration.ofMillis(cfg.timeoutMs()));
+        factory.setConnectTimeout(Duration.ofMillis(timeoutMs));
+        factory.setReadTimeout(Duration.ofMillis(timeoutMs));
         MappingJackson2HttpMessageConverter converter = new MappingJackson2HttpMessageConverter(objectMapper);
         this.restClient = RestClient.builder()
                 .baseUrl(cfg.baseUrl())

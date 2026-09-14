@@ -72,3 +72,7 @@ ai:
   generation:
     max-retries: 3
     similarity-threshold: 0.80
+  # 즉시 피드백은 제출 API에서 동기로 기다리는 경로라 문제 생성(60000ms/3회)보다 짧게 잡는다.
+  instant-feedback:
+    timeout-ms: 10000
+    max-retries: 1
