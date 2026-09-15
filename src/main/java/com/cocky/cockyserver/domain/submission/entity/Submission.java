@@ -68,10 +68,17 @@ public class Submission {
     @Column(name = "is_latest", nullable = false)
     private boolean latest;
 
+    /**
+     * 제출 단위 익명 덮어쓰기. 요청에 isAnonymous가 없으면 서비스 계층이 제출 시점
+     * user.isAnonymousDefault() 값을 그대로 넘겨서 저장한다 — 여기서는 결정된 최종 값만 받는다.
+     */
+    @Column(name = "is_anonymous", nullable = false)
+    private boolean anonymous;
+
     @Column(name = "submitted_at", nullable = false, updatable = false)
     private LocalDateTime submittedAt;
 
-    public Submission(User user, Problem problem, Language language, String code) {
+    public Submission(User user, Problem problem, Language language, String code, boolean anonymous) {
         this.user = user;
         this.problem = problem;
         this.language = language;
@@ -79,6 +86,7 @@ public class Submission {
         this.verdict = Verdict.PENDING;
         this.score = BigDecimal.ZERO.setScale(2);
         this.latest = true;
+        this.anonymous = anonymous;
         this.submittedAt = LocalDateTime.now();
     }
 

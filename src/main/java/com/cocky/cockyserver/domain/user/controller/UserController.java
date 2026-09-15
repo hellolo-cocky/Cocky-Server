@@ -31,6 +31,6 @@ public class UserController {
     @PatchMapping("/me/anonymous")
     public ResponseEntity<AnonymousToggleResponse> toggleAnonymous(
             @AuthenticationPrincipal UserPrincipal principal, @Valid @RequestBody AnonymousToggleRequest request) {
-        return ResponseEntity.ok(userService.setAnonymous(principal.userId(), request.anonymous()));
+        return ResponseEntity.ok(userService.setAnonymous(principal.userId(), request.anonymousDefault()));
     }
 }

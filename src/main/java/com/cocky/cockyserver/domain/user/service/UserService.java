@@ -33,22 +33,25 @@ public class UserService {
     }
 
     /**
-     * 익명 모드 토글. true로 켤 때 anonymous_nickname이 아직 없으면
+     * 익명 모드 "사용자 기본값" 토글. true로 켤 때 anonymous_nickname이 아직 없으면
      * {@link NicknameGenerator#generate}로 채우고, 이미 있으면 재생성하지 않고 재사용한다.
-     * false로 끌 때는 is_anonymous만 내리고 닉네임은 보존한다(재도입 시 재사용).
+     * false로 끌 때는 is_anonymous_default만 내리고 닉네임은 보존한다(재도입 시 재사용).
+     *
+     * <p>이 값은 제출별 기본값일 뿐이다 — 제출 요청이 isAnonymous를 명시하면 그 값이 우선한다
+     * ({@code SubmissionService} 참고).
      *
      * <p>회원가입 경로에서는 절대 호출하지 않는다 — AI 의존성이 신규 가입을 막게 되는 것을
      * 피하기 위해 이 토글 API에서만 온디맨드로 호출한다.
      */
     @Transactional
-    public AnonymousToggleResponse setAnonymous(Long userId, boolean anonymous) {
+    public AnonymousToggleResponse setAnonymous(Long userId, boolean anonymousDefault) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("존재하지 않는 사용자입니다. userId=" + userId));
 
-        if (anonymous && user.getAnonymousNickname() == null) {
+        if (anonymousDefault && user.getAnonymousNickname() == null) {
             user.updateAnonymousNickname(generateUniqueNickname());
         }
-        user.updateAnonymous(anonymous);
+        user.updateAnonymousDefault(anonymousDefault);
 
         return AnonymousToggleResponse.from(user);
     }

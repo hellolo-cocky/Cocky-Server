@@ -53,9 +53,9 @@ class UserControllerTest {
 
         mockMvc.perform(patch("/api/v1/users/me/anonymous")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"anonymous\": true}"))
+                        .content("{\"anonymousDefault\": true}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.anonymous").value(true))
+                .andExpect(jsonPath("$.anonymousDefault").value(true))
                 .andExpect(jsonPath("$.anonymousNickname").value("파란 재귀함수"));
     }
 
@@ -67,13 +67,13 @@ class UserControllerTest {
 
         mockMvc.perform(patch("/api/v1/users/me/anonymous")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"anonymous\": true}"))
+                        .content("{\"anonymousDefault\": true}"))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.code").value("NICKNAME_GENERATION_FAILED"));
     }
 
     @Test
-    void anonymous_필드가_없으면_400이_내려온다() throws Exception {
+    void anonymousDefault_필드가_없으면_400이_내려온다() throws Exception {
         mockMvc.perform(patch("/api/v1/users/me/anonymous")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))

@@ -152,7 +152,9 @@ public class SubmissionService {
 
         User user = userRepository.getReferenceById(userId);
         Problem problem = problemRepository.getReferenceById(validated.problemId());
-        Submission submission = new Submission(user, problem, request.language(), request.code());
+        // 요청에 isAnonymous가 없으면 제출 시점 사용자 기본값을 따르고, 있으면 그 값이 우선한다.
+        boolean anonymous = request.isAnonymous() != null ? request.isAnonymous() : user.isAnonymousDefault();
+        Submission submission = new Submission(user, problem, request.language(), request.code(), anonymous);
 
         // 엔티티는 "이 점수로 세팅해"라는 최종 지시만 받는다 — base/피드백 가산점의 합산은
         // 서비스 책임이고, 엔티티는 그 산출 과정을 몰라도 된다.

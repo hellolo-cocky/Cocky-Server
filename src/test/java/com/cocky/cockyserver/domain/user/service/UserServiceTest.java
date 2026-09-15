@@ -64,10 +64,10 @@ class UserServiceTest {
 
         AnonymousToggleResponse response = userService.setAnonymous(USER_ID, true);
 
-        assertTrue(response.anonymous());
+        assertTrue(response.anonymousDefault());
         assertEquals("파란 재귀함수", response.anonymousNickname());
         assertEquals("파란 재귀함수", user.getAnonymousNickname());
-        assertTrue(user.isAnonymous());
+        assertTrue(user.isAnonymousDefault());
         verify(nicknameGenerator, times(1)).generate();
     }
 
@@ -75,26 +75,26 @@ class UserServiceTest {
     void 토글_on_재호출시_닉네임이_이미_있으면_재생성하지_않는다() {
         User user = user();
         user.updateAnonymousNickname("기존닉네임");
-        user.updateAnonymous(false); // 껐다가 다시 켜는 상황
+        user.updateAnonymousDefault(false); // 껐다가 다시 켜는 상황
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 
         AnonymousToggleResponse response = userService.setAnonymous(USER_ID, true);
 
-        assertTrue(response.anonymous());
+        assertTrue(response.anonymousDefault());
         assertEquals("기존닉네임", response.anonymousNickname());
         verify(nicknameGenerator, never()).generate();
     }
 
     @Test
-    void 토글_off_시_is_anonymous만_내리고_닉네임은_보존한다() {
+    void 토글_off_시_is_anonymous_default만_내리고_닉네임은_보존한다() {
         User user = user();
         user.updateAnonymousNickname("기존닉네임");
-        user.updateAnonymous(true);
+        user.updateAnonymousDefault(true);
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
 
         AnonymousToggleResponse response = userService.setAnonymous(USER_ID, false);
 
-        assertFalse(response.anonymous());
+        assertFalse(response.anonymousDefault());
         assertEquals("기존닉네임", response.anonymousNickname()); // 보존
         verify(nicknameGenerator, never()).generate();
     }
@@ -126,7 +126,7 @@ class UserServiceTest {
         verify(nicknameGenerator, times(5)).generate();
         // 5회 소진으로 예외가 났으면 user 엔티티에 닉네임이 써지지 않은 채로 남아야 한다.
         assertNull(user.getAnonymousNickname());
-        assertFalse(user.isAnonymous());
+        assertFalse(user.isAnonymousDefault());
     }
 
     @Test

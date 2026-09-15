@@ -1,7 +1,9 @@
 package com.cocky.cockyserver.domain.submission.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -23,6 +25,7 @@ import com.cocky.cockyserver.domain.submission.exception.RoundClosedException;
 import com.cocky.cockyserver.domain.submission.exception.TestCaseNotConfiguredException;
 import com.cocky.cockyserver.domain.submission.judge.JudgeResult;
 import com.cocky.cockyserver.domain.submission.judge.JudgeService;
+import com.cocky.cockyserver.domain.submission.entity.Submission;
 import com.cocky.cockyserver.domain.submission.repository.SubmissionRepository;
 import com.cocky.cockyserver.domain.topic.entity.Topic;
 import com.cocky.cockyserver.domain.user.entity.Role;
@@ -38,6 +41,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -92,6 +96,10 @@ class SubmissionServiceTest {
 
     private SubmissionRequest request(Language language) {
         return new SubmissionRequest(PROBLEM_ID, language, "print(1)", false);
+    }
+
+    private SubmissionRequest request(Language language, Boolean isAnonymous) {
+        return new SubmissionRequest(PROBLEM_ID, language, "print(1)", isAnonymous);
     }
 
     @Test
@@ -183,5 +191,65 @@ class SubmissionServiceTest {
 
         assertThrows(TestCaseNotConfiguredException.class,
                 () -> submissionService.submit(USER_ID, request(Language.PYTHON)));
+    }
+
+    /** isAnonymous가 null이면 요청 시점 user.isAnonymousDefault() 값이 그대로 적용된다. */
+    @Test
+    void 요청의_isAnonymous가_null이면_사용자_기본값이_적용된다() {
+        Problem problem = problem(activeRound(), Language.PYTHON, Difficulty.HARD);
+        User user = new User(100L, "student@gsm.hs.kr", "홍길동", 2, 3, 15, "SW과", Role.STUDENT);
+        user.updateAnonymousDefault(true);
+        when(problemRepository.findById(PROBLEM_ID)).thenReturn(Optional.of(problem));
+        when(problemRepository.getReferenceById(any())).thenReturn(problem);
+        when(testCaseRepository.findByProblemIdOrderByIdAsc(any()))
+                .thenReturn(List.of(new TestCase(problem, "1", "1", true)));
+        when(judgeService.judge(any())).thenReturn(new JudgeResult(Verdict.AC, 1, 1, 50, 1024));
+        when(userRepository.getReferenceById(USER_ID)).thenReturn(user);
+        ArgumentCaptor<Submission> captor = ArgumentCaptor.forClass(Submission.class);
+        when(submissionRepository.save(captor.capture())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        submissionService.submit(USER_ID, request(Language.PYTHON, null));
+
+        assertTrue(captor.getValue().isAnonymous());
+    }
+
+    /** isAnonymous가 null이 아니면 요청 값이 사용자 기본값보다 우선한다. */
+    @Test
+    void 요청의_isAnonymous가_null이_아니면_요청_값이_우선한다() {
+        Problem problem = problem(activeRound(), Language.PYTHON, Difficulty.HARD);
+        User user = new User(100L, "student@gsm.hs.kr", "홍길동", 2, 3, 15, "SW과", Role.STUDENT);
+        // 사용자 기본값은 false지만 요청이 true를 명시 — 요청 값이 이겨야 한다.
+        when(problemRepository.findById(PROBLEM_ID)).thenReturn(Optional.of(problem));
+        when(problemRepository.getReferenceById(any())).thenReturn(problem);
+        when(testCaseRepository.findByProblemIdOrderByIdAsc(any()))
+                .thenReturn(List.of(new TestCase(problem, "1", "1", true)));
+        when(judgeService.judge(any())).thenReturn(new JudgeResult(Verdict.AC, 1, 1, 50, 1024));
+        when(userRepository.getReferenceById(USER_ID)).thenReturn(user);
+        ArgumentCaptor<Submission> captor = ArgumentCaptor.forClass(Submission.class);
+        when(submissionRepository.save(captor.capture())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        submissionService.submit(USER_ID, request(Language.PYTHON, true));
+
+        assertTrue(captor.getValue().isAnonymous());
+    }
+
+    /** 사용자 기본값이 true여도 요청이 명시적으로 false면 실명(비익명)으로 저장된다. */
+    @Test
+    void 사용자_기본값이_true여도_요청이_false면_실명이다() {
+        Problem problem = problem(activeRound(), Language.PYTHON, Difficulty.HARD);
+        User user = new User(100L, "student@gsm.hs.kr", "홍길동", 2, 3, 15, "SW과", Role.STUDENT);
+        user.updateAnonymousDefault(true);
+        when(problemRepository.findById(PROBLEM_ID)).thenReturn(Optional.of(problem));
+        when(problemRepository.getReferenceById(any())).thenReturn(problem);
+        when(testCaseRepository.findByProblemIdOrderByIdAsc(any()))
+                .thenReturn(List.of(new TestCase(problem, "1", "1", true)));
+        when(judgeService.judge(any())).thenReturn(new JudgeResult(Verdict.AC, 1, 1, 50, 1024));
+        when(userRepository.getReferenceById(USER_ID)).thenReturn(user);
+        ArgumentCaptor<Submission> captor = ArgumentCaptor.forClass(Submission.class);
+        when(submissionRepository.save(captor.capture())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        submissionService.submit(USER_ID, request(Language.PYTHON, false));
+
+        assertFalse(captor.getValue().isAnonymous());
     }
 }

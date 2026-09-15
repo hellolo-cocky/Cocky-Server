@@ -59,8 +59,8 @@ public class User {
     @Column(name = "anonymous_nickname", length = 50, unique = true)
     private String anonymousNickname;
 
-    @Column(name = "is_anonymous", nullable = false)
-    private boolean anonymous;
+    @Column(name = "is_anonymous_default", nullable = false)
+    private boolean anonymousDefault;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -103,7 +103,7 @@ public class User {
         this.anonymousNickname = anonymousNickname;
     }
 
-    public void updateAnonymous(boolean anonymous) {
-        this.anonymous = anonymous;
+    public void updateAnonymousDefault(boolean anonymousDefault) {
+        this.anonymousDefault = anonymousDefault;
     }
 }
