@@ -68,7 +68,7 @@ class SubmissionRepositoryTest {
      */
     private void persistSubmission(User user, Problem problem, Language language, Verdict verdict,
                                     LocalDateTime submittedAt) {
-        Submission submission = new Submission(user, problem, language, "print(1)");
+        Submission submission = new Submission(user, problem, language, "print(1)", false);
         submission.updateResult(verdict, BigDecimal.ZERO.setScale(2));
         ReflectionTestUtils.setField(submission, "submittedAt", submittedAt);
         entityManager.persist(submission);

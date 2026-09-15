@@ -13,9 +13,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * 단계 3: 랭킹 응답의 nickname이 user.isAnonymous()에 따라 달라지는지 검증.
+ * 랭킹 응답의 nickname이 user.isAnonymousDefault()(사용자 기본값)에 따라 달라지는지 검증.
  * ranking_snapshot이 이름을 직접 저장하지 않고 snapshot.getUser()로 조회 시점 값을 읽으므로
  * (RankingEntryResponse.from Javadoc 참고) User 엔티티 상태만 바꿔가며 확인하면 된다.
+ * submission 단위 익명은 스냅샷이 submission을 참조하지 않아 반영할 수 없다(같은 Javadoc 참고).
  */
 class RankingEntryResponseTest {
 
@@ -43,7 +44,7 @@ class RankingEntryResponseTest {
     void 익명이면_anonymous_nickname을_반환한다() {
         User user = user("홍길동");
         user.updateAnonymousNickname("파란 재귀함수");
-        user.updateAnonymous(true);
+        user.updateAnonymousDefault(true);
 
         RankingEntryResponse response = RankingEntryResponse.from(snapshotFor(user));
 
