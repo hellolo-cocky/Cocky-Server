@@ -15,6 +15,9 @@ public interface ProblemRepository extends JpaRepository<Problem, Long> {
 
     List<Problem> findByRoundIdOrderByIdAsc(Long roundId);
 
+    /** 스케줄러가 "문제 0개인 비활성 회차"(전체 실패로 남은 빈 회차) 재사용 여부를 판단할 때 쓴다. */
+    boolean existsByRoundId(Long roundId);
+
     /** 최근 문제 지문을 스케줄러가 pastStatements(중복 검사용)로 쓴다. */
     List<Problem> findTop20ByOrderByCreatedAtDesc();
 

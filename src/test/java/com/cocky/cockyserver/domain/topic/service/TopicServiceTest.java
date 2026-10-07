@@ -56,7 +56,7 @@ class TopicServiceTest {
         topicService = new TopicService(roundService, roundRepository, topicRepository);
         Topic topic = new Topic("그래프", 5);
         when(roundService.getCurrentActiveRound()).thenThrow(new RoundNotFoundException("없음"));
-        when(roundRepository.findTopByOrderByRoundDateDesc()).thenReturn(Optional.of(round(topic)));
+        when(roundRepository.findTopRoundWithProblems()).thenReturn(Optional.of(round(topic)));
 
         TopicResponse response = topicService.getCurrentTopic();
 
@@ -65,10 +65,24 @@ class TopicServiceTest {
     }
 
     @Test
+    void currentTopic_fallbackUsesRoundWithProblemsQuery_soEmptyFailedRoundTopicIsNotExposed() {
+        // 빈 실패 회차 제외는 RoundRepositoryTest가 실제 JPQL로 검증한다.
+        // 여기서는 폴백이 "문제 있는 회차" 쿼리만 쓰고 옛 쿼리(전체 최신)로 되돌아가지 않는지 고정한다.
+        topicService = new TopicService(roundService, roundRepository, topicRepository);
+        when(roundService.getCurrentActiveRound()).thenThrow(new RoundNotFoundException("없음"));
+        when(roundRepository.findTopRoundWithProblems()).thenReturn(Optional.of(round(new Topic("배열", 3))));
+
+        TopicResponse response = topicService.getCurrentTopic();
+
+        assertEquals(3, response.topicOrder());
+        org.mockito.Mockito.verify(roundRepository).findTopRoundWithProblems();
+    }
+
+    @Test
     void currentTopic_throwsWhenNoRoundExistsAtAll() {
         topicService = new TopicService(roundService, roundRepository, topicRepository);
         when(roundService.getCurrentActiveRound()).thenThrow(new RoundNotFoundException("없음"));
-        when(roundRepository.findTopByOrderByRoundDateDesc()).thenReturn(Optional.empty());
+        when(roundRepository.findTopRoundWithProblems()).thenReturn(Optional.empty());
 
         assertThrows(TopicNotFoundException.class, () -> topicService.getCurrentTopic());
     }

@@ -55,7 +55,7 @@ public class RankingBatchService {
     @Transactional
     public RankingSnapshotResult generateTwoDaySnapshot() {
         LocalDateTime now = LocalDateTime.now(clock);
-        Round closedRound = roundRepository.findTopByCloseAtLessThanEqualOrderByCloseAtDesc(now).orElse(null);
+        Round closedRound = roundRepository.findTopClosedRoundWithProblems(now).orElse(null);
         if (closedRound == null) {
             return RankingSnapshotResult.skipped(PeriodType.TWO_DAY, BATCH_SCOPE_TYPE, null, "NO_CLOSED_ROUND");
         }

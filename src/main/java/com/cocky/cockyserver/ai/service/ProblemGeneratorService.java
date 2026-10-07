@@ -1,6 +1,7 @@
 package com.cocky.cockyserver.ai.service;
 
 import com.cocky.cockyserver.ai.client.OpenAiClient;
+import com.cocky.cockyserver.ai.client.OpenAiException;
 import com.cocky.cockyserver.ai.config.AiProperties;
 import com.cocky.cockyserver.ai.dto.Difficulty;
 import com.cocky.cockyserver.ai.dto.ExampleIo;
@@ -48,16 +49,39 @@ public class ProblemGeneratorService implements ProblemGenerator {
     public GenerationOutcome generate(GenerationRequest request) {
         List<GenerationItem> items = new ArrayList<>();
         List<String> seenStatements = new ArrayList<>(request.pastStatements());
+        String abortReason = null; // 재시도 불가 오류(크레딧 소진·키 오류)가 나면 이후 조합은 시도하지 않는다.
         for (Language lang : request.languages()) {
             for (Difficulty diff : request.difficulties()) {
-                GenerationItem item = generateOne(request, lang, diff, seenStatements);
-                items.add(item);
-                if (item.success()) {
-                    seenStatements.add(item.problem().statement());
+                if (abortReason != null) {
+                    // 같은 키로는 어차피 전부 실패 — 호출 없이 실패 레코드만 채워 조합 수(로그 행 수)를 맞춘다.
+                    items.add(GenerationItem.failure(lang, diff, 0, "재시도 불가 오류로 건너뜀: " + abortReason));
+                    continue;
+                }
+                try {
+                    GenerationItem item = generateOne(request, lang, diff, seenStatements);
+                    items.add(item);
+                    if (item.success()) {
+                        seenStatements.add(item.problem().statement());
+                    }
+                } catch (FatalOpenAiException e) {
+                    log.error("[{}/{}] 재시도 불가 OpenAI 오류 — 남은 조합 생성을 중단한다: {}",
+                            lang, diff, e.getMessage());
+                    abortReason = e.getMessage();
+                    items.add(e.item);
                 }
             }
         }
         return new GenerationOutcome(items);
+    }
+
+    /** 재시도 불가 오류로 생성 전체를 중단해야 할 때 generateOne → generate로 올리는 내부 신호. */
+    private static class FatalOpenAiException extends RuntimeException {
+        private final transient GenerationItem item;
+
+        FatalOpenAiException(String message, GenerationItem item) {
+            super(message);
+            this.item = item;
+        }
     }
 
     /**
@@ -108,6 +132,12 @@ public class ProblemGeneratorService implements ProblemGenerator {
                         parsed.statement, verified.examples(), parsed.answerCode, req.roundSubtype());
                 return GenerationItem.success(problem, attempt);
             } catch (RuntimeException e) {
+                if (e instanceof OpenAiException oe && !oe.isRetryable()) {
+                    // 크레딧 소진·키 오류 — 남은 시도 횟수가 있어도 즉시 포기.
+                    log.error("[{}/{}] 재시도 불가 오류 — 시도 {}에서 포기: {}", lang, diff, attempt, e.getMessage());
+                    throw new FatalOpenAiException(e.getMessage(),
+                            GenerationItem.failure(lang, diff, attempt, e.getMessage()));
+                }
                 lastReason = e.getMessage();
                 log.warn("[{}/{}] 생성 시도 {} 실패: {}", lang, diff, attempt, e.getMessage());
             }
