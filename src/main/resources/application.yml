@@ -45,14 +45,29 @@ auth:
   admin-emails: ${ADMIN_EMAILS:}
 
 
-judge0:
-  # 비어 있으면(미설정) Judge0Config가 StubJudgeService로 폴백한다 — OPENAI_API_KEY 부재 시
-  # AI 모듈이 데모 모드로 도는 것과 동일한 패턴. 로컬에서 Judge0를 직접 띄워 붙일 땐
-  # JUDGE0_URL=http://localhost:2358 을 명시할 것.
-  url: ${JUDGE0_URL:}
-  token: ${JUDGE0_TOKEN:}
+# 채점 엔진 선택: judge0 | runner | stub. 기본 stub(항상 가짜 결과 — 채점 VM이 없는 환경용).
+# runner면 runner.url/token 필수(비면 기동 실패). judge0면 judge0.url이 비었을 때 stub으로 폴백한다.
+# time/memory 제한은 problem별 컬럼이 생기기 전까지 쓰는 엔진 공통 전역 기본값.
+judge:
+  engine: ${JUDGE_ENGINE:stub}
   default-time-limit-ms: 2000
   default-memory-limit-kb: 131072
+
+# 로컬에서 Judge0를 직접 띄워 붙일 땐 JUDGE_ENGINE=judge0 JUDGE0_URL=http://localhost:2358
+judge0:
+  url: ${JUDGE0_URL:}
+  token: ${JUDGE0_TOKEN:}
+
+# cocky-runner (자체 채점 서버). read-timeout은 judge 호출(케이스 전체 채점)을 기다리는 시간.
+runner:
+  url: ${RUNNER_URL:}
+  token: ${RUNNER_TOKEN:}
+  connect-timeout-ms: 3000
+  read-timeout-ms: 60000
+
+# POST /api/v1/run — 유저당 분당 호출 제한(인메모리)
+run:
+  rate-limit-per-minute: 10
 
 
 ai:

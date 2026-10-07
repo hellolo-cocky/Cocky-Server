@@ -27,7 +27,7 @@ class Judge0ClientTest {
     void submitSendsSourceCodeAndLanguageIdInActualHttpBody() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        Judge0Properties properties = new Judge0Properties("http://localhost:2358", "", 2000, 131072);
+        Judge0Properties properties = new Judge0Properties("http://localhost:2358", "");
         Judge0Client client = new Judge0Client(builder, properties);
 
         server.expect(requestTo(containsString("/submissions")))
