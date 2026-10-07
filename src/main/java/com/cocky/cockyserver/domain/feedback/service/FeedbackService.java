@@ -152,7 +152,7 @@ public class FeedbackService {
     }
 
     /**
-     * domain.problem.entity.Language → ai.dto.Language(AI 모듈 계약, judge0Id 보유) 변환.
+     * domain.problem.entity.Language → ai.dto.Language(AI 모듈 계약) 변환.
      * 두 enum은 의도적으로 분리된 타입이라 통합하지 않는다 — {@code valueOf(name())} 대신 switch로
      * 명시 매핑해서, 도메인에 새 언어가 추가돼도(default 없음) 여기서 컴파일 에러로 바로 드러나게 한다.
      */
