@@ -4,6 +4,9 @@ import com.cocky.cockyserver.domain.submission.entity.Verdict;
 import com.cocky.cockyserver.domain.submission.judge.JudgeRequest;
 import com.cocky.cockyserver.domain.submission.judge.JudgeResult;
 import com.cocky.cockyserver.domain.submission.judge.JudgeService;
+import com.cocky.cockyserver.domain.submission.judge.RunRequest;
+import com.cocky.cockyserver.domain.submission.judge.RunResult;
+import com.cocky.cockyserver.domain.submission.judge.RunStatus;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -46,12 +49,13 @@ public class StubJudgeService implements JudgeService {
     private static final int DUMMY_TIME_MS = 120;
     private static final int DUMMY_MEMORY_KB = 2048;
     private static final int DUMMY_TLE_TIME_MS = 5000;
+    private static final String STUB_RUN_STDOUT = "[STUB] 코드가 실제로 실행되지 않았습니다.\n";
 
     public StubJudgeService() {
         log.warn("============================================================");
-        log.warn(" [STUB] StubJudgeService 활성화 — Judge0가 연동되어 있지 않습니다.");
+        log.warn(" [STUB] StubJudgeService 활성화 — 실제 채점 엔진이 연동되어 있지 않습니다.");
         log.warn(" [STUB] 모든 채점 결과는 가짜(기본 AC/만점)이며 코드가 실제로 실행되지 않습니다.");
-        log.warn(" [STUB] JUDGE0_URL을 설정하면 실제 Judge0 채점으로 전환됩니다.");
+        log.warn(" [STUB] JUDGE_ENGINE=runner(또는 judge0)로 설정하면 실제 채점으로 전환됩니다.");
         log.warn("============================================================");
     }
 
@@ -71,6 +75,13 @@ public class StubJudgeService implements JudgeService {
                 requestId, request.language(), result.verdict(), result.passedCount(), result.totalCount());
 
         return result;
+    }
+
+    /** 고정된 가짜 실행 결과 — 매직 주석은 채점(judge)에만 적용된다. */
+    @Override
+    public RunResult run(RunRequest request) {
+        log.info("[STUB 실행] language={} — 가짜 실행 결과입니다(코드가 실제로 실행되지 않음).", request.language());
+        return new RunResult(RunStatus.OK, STUB_RUN_STDOUT, "", null, DUMMY_TIME_MS);
     }
 
     private Verdict extractForcedVerdict(String code) {

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.cocky.cockyserver.ai.port.InstantFeedbackProvider;
@@ -31,6 +32,7 @@ import com.cocky.cockyserver.domain.topic.entity.Topic;
 import com.cocky.cockyserver.domain.user.entity.Role;
 import com.cocky.cockyserver.domain.user.entity.User;
 import com.cocky.cockyserver.domain.user.repository.UserRepository;
+import com.cocky.cockyserver.global.exception.InputTooLargeException;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -191,6 +193,32 @@ class SubmissionServiceTest {
 
         assertThrows(TestCaseNotConfiguredException.class,
                 () -> submissionService.submit(USER_ID, request(Language.PYTHON)));
+    }
+
+    @Test
+    void code가_64KB를_넘으면_InputTooLarge이고_DB와_엔진을_건드리지_않는다() {
+        SubmissionRequest tooLarge = new SubmissionRequest(PROBLEM_ID, Language.PYTHON, "a".repeat(64 * 1024 + 1), false);
+
+        assertThrows(InputTooLargeException.class, () -> submissionService.submit(USER_ID, tooLarge));
+
+        verifyNoInteractions(problemRepository, testCaseRepository, judgeService, instantFeedbackProvider);
+    }
+
+    /** 한글은 문자당 3바이트 — 문자 수는 64K 미만이어도 바이트로 세면 초과다. */
+    @Test
+    void code_크기는_문자수가_아니라_UTF8_바이트로_센다() {
+        SubmissionRequest multibyte = new SubmissionRequest(PROBLEM_ID, Language.PYTHON, "가".repeat(21_846), false);
+
+        assertThrows(InputTooLargeException.class, () -> submissionService.submit(USER_ID, multibyte));
+    }
+
+    @Test
+    void code가_정확히_64KB면_크기_검사를_통과한다() {
+        // 크기 검사를 통과하면 다음 단계(문제 조회)로 넘어가므로 ProblemNotFound가 나야 한다.
+        when(problemRepository.findById(PROBLEM_ID)).thenReturn(Optional.empty());
+        SubmissionRequest exact = new SubmissionRequest(PROBLEM_ID, Language.PYTHON, "a".repeat(64 * 1024), false);
+
+        assertThrows(ProblemNotFoundException.class, () -> submissionService.submit(USER_ID, exact));
     }
 
     /** isAnonymous가 null이면 요청 시점 user.isAnonymousDefault() 값이 그대로 적용된다. */

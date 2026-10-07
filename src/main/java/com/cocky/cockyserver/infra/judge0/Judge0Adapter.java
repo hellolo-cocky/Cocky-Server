@@ -5,7 +5,10 @@ import com.cocky.cockyserver.domain.submission.judge.JudgeExecutionException;
 import com.cocky.cockyserver.domain.submission.judge.JudgeRequest;
 import com.cocky.cockyserver.domain.submission.judge.JudgeResult;
 import com.cocky.cockyserver.domain.submission.judge.JudgeService;
+import com.cocky.cockyserver.domain.submission.judge.RunRequest;
+import com.cocky.cockyserver.domain.submission.judge.RunResult;
 import com.cocky.cockyserver.domain.submission.judge.TestCaseIO;
+import com.cocky.cockyserver.infra.judge.JudgeProperties;
 import com.cocky.cockyserver.infra.judge0.dto.Judge0SubmissionRequest;
 import com.cocky.cockyserver.infra.judge0.dto.Judge0SubmissionResult;
 import java.nio.charset.StandardCharsets;
@@ -26,12 +29,19 @@ public class Judge0Adapter implements JudgeService {
 
     private final Judge0Client client;
     private final LanguageMapper languageMapper;
-    private final Judge0Properties properties;
+    private final JudgeProperties properties;
 
-    public Judge0Adapter(Judge0Client client, LanguageMapper languageMapper, Judge0Properties properties) {
+    public Judge0Adapter(Judge0Client client, LanguageMapper languageMapper, JudgeProperties properties) {
         this.client = client;
         this.languageMapper = languageMapper;
         this.properties = properties;
+    }
+
+    /** Judge0 엔진은 단순 실행(/run)을 지원하지 않는다 — 호출 측(RunService)이 502로 변환한다. */
+    @Override
+    public RunResult run(RunRequest request) {
+        throw new UnsupportedOperationException(
+                "Judge0 엔진은 코드 단순 실행(/run)을 지원하지 않습니다. JUDGE_ENGINE=runner를 사용하세요.");
     }
 
     @Override

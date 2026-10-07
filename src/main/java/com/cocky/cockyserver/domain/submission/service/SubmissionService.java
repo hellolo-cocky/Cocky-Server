@@ -26,6 +26,7 @@ import com.cocky.cockyserver.domain.submission.exception.TestCaseNotConfiguredEx
 import com.cocky.cockyserver.domain.submission.judge.JudgeRequest;
 import com.cocky.cockyserver.domain.submission.judge.JudgeResult;
 import com.cocky.cockyserver.domain.submission.judge.JudgeService;
+import com.cocky.cockyserver.global.validation.InputSizeGuard;
 import com.cocky.cockyserver.domain.submission.judge.TestCaseIO;
 import com.cocky.cockyserver.domain.submission.repository.SubmissionRepository;
 import com.cocky.cockyserver.domain.user.entity.User;
@@ -86,6 +87,8 @@ public class SubmissionService {
     }
 
     public SubmissionResponse submit(Long userId, SubmissionRequest request) {
+        // DB·채점 엔진을 건드리기 전에 막는다 — 64KB 초과 코드는 사용자 입력 오류(400)이지 채점 서버 오류(502)가 아니다.
+        InputSizeGuard.requireWithinLimit("code", request.code());
         Validated validated = readOnlyTransaction.execute(status -> validate(request));
         JudgeResult judgeResult = judgeService.judge(validated.judgeRequest());
         InstantFeedback feedback = evaluateFeedback(request, validated);

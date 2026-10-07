@@ -7,6 +7,7 @@ import com.cocky.cockyserver.domain.submission.entity.Verdict;
 import com.cocky.cockyserver.domain.submission.judge.JudgeRequest;
 import com.cocky.cockyserver.domain.submission.judge.JudgeResult;
 import com.cocky.cockyserver.domain.submission.judge.TestCaseIO;
+import com.cocky.cockyserver.infra.judge.JudgeProperties;
 import java.util.List;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -28,11 +29,11 @@ class Judge0AdapterIT {
 
     private final Judge0Properties properties = new Judge0Properties(
             envOrDefault("JUDGE0_URL", "http://localhost:2358"),
-            envOrDefault("JUDGE0_TOKEN", ""),
-            2000, 131072);
+            envOrDefault("JUDGE0_TOKEN", ""));
+    private final JudgeProperties judgeProperties = new JudgeProperties("judge0", 2000, 131072);
     private final Judge0Client client = new Judge0Client(RestClient.builder(), properties);
     private final LanguageMapper languageMapper = new LanguageMapper();
-    private final Judge0Adapter adapter = new Judge0Adapter(client, languageMapper, properties);
+    private final Judge0Adapter adapter = new Judge0Adapter(client, languageMapper, judgeProperties);
 
     @Test
     void pythonCorrectAnswerIsAccepted() {

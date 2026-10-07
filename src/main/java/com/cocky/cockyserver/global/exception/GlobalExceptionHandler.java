@@ -11,6 +11,7 @@ import com.cocky.cockyserver.domain.problem.exception.ProblemNotFoundException;
 import com.cocky.cockyserver.domain.ranking.exception.RankingNotFoundException;
 import com.cocky.cockyserver.domain.ranking.exception.UnsupportedRankingCombinationException;
 import com.cocky.cockyserver.domain.round.exception.RoundNotFoundException;
+import com.cocky.cockyserver.domain.run.exception.RunRateLimitExceededException;
 import com.cocky.cockyserver.domain.submission.exception.LanguageMismatchException;
 import com.cocky.cockyserver.domain.submission.exception.RoundClosedException;
 import com.cocky.cockyserver.domain.submission.exception.SubmissionAccessDeniedException;
@@ -20,6 +21,7 @@ import com.cocky.cockyserver.domain.submission.judge.JudgeExecutionException;
 import com.cocky.cockyserver.domain.topic.exception.TopicNotFoundException;
 import com.cocky.cockyserver.domain.user.exception.UserNotFoundException;
 import com.cocky.cockyserver.global.security.AuthErrorCode;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -100,6 +102,19 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleJudgeExecutionFailed(JudgeExecutionException e) {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                 .body(new ErrorResponse("JUDGE_EXECUTION_FAILED", e.getMessage()));
+    }
+
+    @ExceptionHandler(InputTooLargeException.class)
+    public ResponseEntity<ErrorResponse> handleInputTooLarge(InputTooLargeException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse("INVALID_REQUEST", e.getMessage()));
+    }
+
+    @ExceptionHandler(RunRateLimitExceededException.class)
+    public ResponseEntity<ErrorResponse> handleRunRateLimitExceeded(RunRateLimitExceededException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(e.getRetryAfterSeconds()))
+                .body(new ErrorResponse("RATE_LIMIT_EXCEEDED", e.getMessage()));
     }
 
     /** ai.port.PeriodFeedbackProvider#summarize 실패(OpenAI 호출/파싱/빈 응답) — 단계 2. */
