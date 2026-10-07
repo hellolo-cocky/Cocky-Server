@@ -91,7 +91,7 @@ class RankingBatchServiceTest {
 
     @Test
     void noClosedRound_skipsWithoutQueryingSubmissions() {
-        when(roundRepository.findTopByCloseAtLessThanEqualOrderByCloseAtDesc(NOW)).thenReturn(Optional.empty());
+        when(roundRepository.findTopClosedRoundWithProblems(NOW)).thenReturn(Optional.empty());
 
         RankingSnapshotResult result = rankingBatchService.generateTwoDaySnapshot();
 
@@ -103,7 +103,7 @@ class RankingBatchServiceTest {
 
     @Test
     void alreadyGeneratedForClosedRound_skipsWithoutAggregating() {
-        when(roundRepository.findTopByCloseAtLessThanEqualOrderByCloseAtDesc(NOW))
+        when(roundRepository.findTopClosedRoundWithProblems(NOW))
                 .thenReturn(Optional.of(closedRound()));
         when(rankingSnapshotRepository.existsByPeriodTypeAndScopeTypeAndRoundId(
                 PeriodType.TWO_DAY, ScopeType.SCHOOL, CLOSED_ROUND_ID))
@@ -120,7 +120,7 @@ class RankingBatchServiceTest {
     @Test
     void standardCompetitionRanking_tiesShareRankAndSkipNext() {
         // 100 / 80 / 80(동점) / 50 → 순위 1,2,2,4. 쿼리 계약상 이미 점수 내림차순 정렬돼 온다.
-        when(roundRepository.findTopByCloseAtLessThanEqualOrderByCloseAtDesc(NOW))
+        when(roundRepository.findTopClosedRoundWithProblems(NOW))
                 .thenReturn(Optional.of(closedRound()));
         when(rankingSnapshotRepository.existsByPeriodTypeAndScopeTypeAndRoundId(
                 PeriodType.TWO_DAY, ScopeType.SCHOOL, CLOSED_ROUND_ID))
@@ -163,7 +163,7 @@ class RankingBatchServiceTest {
 
     @Test
     void noSubmissionsForClosedRound_returnsCompletedWithZeroRowsWithoutSaving() {
-        when(roundRepository.findTopByCloseAtLessThanEqualOrderByCloseAtDesc(NOW))
+        when(roundRepository.findTopClosedRoundWithProblems(NOW))
                 .thenReturn(Optional.of(closedRound()));
         when(rankingSnapshotRepository.existsByPeriodTypeAndScopeTypeAndRoundId(
                 PeriodType.TWO_DAY, ScopeType.SCHOOL, CLOSED_ROUND_ID))
@@ -181,7 +181,7 @@ class RankingBatchServiceTest {
     void concurrentSaveViolatesUniqueConstraint_convertsToAlreadyGeneratedSkip() {
         // exists 체크는 통과했지만(경쟁상태로 다른 스레드가 먼저 커밋) 실제 저장 시점에
         // V11 유니크 제약(period_type, scope_type, period_key, user_id)에 걸리는 시나리오.
-        when(roundRepository.findTopByCloseAtLessThanEqualOrderByCloseAtDesc(NOW))
+        when(roundRepository.findTopClosedRoundWithProblems(NOW))
                 .thenReturn(Optional.of(closedRound()));
         when(rankingSnapshotRepository.existsByPeriodTypeAndScopeTypeAndRoundId(
                 PeriodType.TWO_DAY, ScopeType.SCHOOL, CLOSED_ROUND_ID))
@@ -202,7 +202,7 @@ class RankingBatchServiceTest {
     @Test
     void missingUser_excludedFromSnapshotWithoutFailingBatch() {
         // 집계 시점과 유저 조회 시점 사이 탈퇴 등으로 userId=2가 사라진 경우.
-        when(roundRepository.findTopByCloseAtLessThanEqualOrderByCloseAtDesc(NOW))
+        when(roundRepository.findTopClosedRoundWithProblems(NOW))
                 .thenReturn(Optional.of(closedRound()));
         when(rankingSnapshotRepository.existsByPeriodTypeAndScopeTypeAndRoundId(
                 PeriodType.TWO_DAY, ScopeType.SCHOOL, CLOSED_ROUND_ID))

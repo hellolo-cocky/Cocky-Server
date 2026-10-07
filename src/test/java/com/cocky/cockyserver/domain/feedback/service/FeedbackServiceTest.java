@@ -65,7 +65,7 @@ class FeedbackServiceTest {
         RoundRepository roundRepository = mock(RoundRepository.class);
         // nextTopic 계산(WEEKLY/MONTHLY 공통 경로)이 라운드를 조회하므로, 이 테스트의 관심사인
         // 기간 경계 계산과는 무관하게 빈 결과로 흘려보낸다.
-        when(roundRepository.findTopByOrderByRoundDateDesc()).thenReturn(Optional.empty());
+        when(roundRepository.findTopRoundWithProblems()).thenReturn(Optional.empty());
         when(submissionRepository.aggregateLanguageCountsByUserAndPeriod(any(), any(), any()))
                 .thenReturn(List.of());
         when(submissionRepository.aggregateDifficultyCountsByUserAndPeriod(any(), any(), any()))
@@ -184,7 +184,7 @@ class FeedbackServiceTest {
                 languageCount(com.cocky.cockyserver.domain.problem.entity.Language.JAVA, 2));
         when(submissionRepository.aggregateLanguageCountsByUserAndPeriod(any(), any(), any()))
                 .thenReturn(rows);
-        when(roundRepository.findTopByOrderByRoundDateDesc()).thenReturn(Optional.empty());
+        when(roundRepository.findTopRoundWithProblems()).thenReturn(Optional.empty());
 
         PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
                 .aggregateStats(1L, Period.WEEKLY);
@@ -205,7 +205,7 @@ class FeedbackServiceTest {
                 difficultyCount(com.cocky.cockyserver.domain.problem.entity.Difficulty.HARD, 1));
         when(submissionRepository.aggregateDifficultyCountsByUserAndPeriod(any(), any(), any()))
                 .thenReturn(rows);
-        when(roundRepository.findTopByOrderByRoundDateDesc()).thenReturn(Optional.empty());
+        when(roundRepository.findTopRoundWithProblems()).thenReturn(Optional.empty());
 
         PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
                 .aggregateStats(1L, Period.WEEKLY);
@@ -223,7 +223,7 @@ class FeedbackServiceTest {
         List<SubmissionRepository.VerdictCount> rows = List.of(verdictCount(Verdict.WA, 2), verdictCount(Verdict.TLE, 1));
         when(submissionRepository.aggregateWrongVerdictCountsByUserAndPeriod(any(), any(), any()))
                 .thenReturn(rows);
-        when(roundRepository.findTopByOrderByRoundDateDesc()).thenReturn(Optional.empty());
+        when(roundRepository.findTopRoundWithProblems()).thenReturn(Optional.empty());
 
         PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
                 .aggregateStats(1L, Period.WEEKLY);
@@ -237,7 +237,7 @@ class FeedbackServiceTest {
         RoundRepository roundRepository = mock(RoundRepository.class);
         TopicRepository topicRepository = mock(TopicRepository.class);
         stubEmptyAggregates(submissionRepository);
-        when(roundRepository.findTopByOrderByRoundDateDesc()).thenReturn(Optional.empty());
+        when(roundRepository.findTopRoundWithProblems()).thenReturn(Optional.empty());
 
         PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
                 .aggregateStats(1L, Period.WEEKLY);
@@ -258,14 +258,14 @@ class FeedbackServiceTest {
         Topic topic = new Topic("주제", 3);
         Round closedRound = new Round(topic, LocalDate.of(2026, 7, 6),
                 LocalDateTime.of(2026, 7, 6, 0, 0), LocalDateTime.of(2026, 7, 7, 0, 0));
-        when(roundRepository.findTopByCloseAtLessThanEqualOrderByCloseAtDesc(any()))
+        when(roundRepository.findTopClosedRoundWithProblems(any()))
                 .thenReturn(Optional.of(closedRound));
 
         PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
                 .aggregateStats(1L, Period.ROUND);
 
         assertThat(stats.nextTopic()).isNull();
-        verify(roundRepository, never()).findTopByOrderByRoundDateDesc();
+        verify(roundRepository, never()).findTopRoundWithProblems();
     }
 
     @Test
@@ -274,13 +274,13 @@ class FeedbackServiceTest {
         RoundRepository roundRepository = mock(RoundRepository.class);
         TopicRepository topicRepository = mock(TopicRepository.class);
         stubEmptyAggregates(submissionRepository);
-        when(roundRepository.findTopByCloseAtLessThanEqualOrderByCloseAtDesc(any())).thenReturn(Optional.empty());
+        when(roundRepository.findTopClosedRoundWithProblems(any())).thenReturn(Optional.empty());
 
         PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
                 .aggregateStats(1L, Period.WEEKLY);
 
         assertThat(stats.nextTopic()).isNull();
-        verify(roundRepository, never()).findTopByOrderByRoundDateDesc();
+        verify(roundRepository, never()).findTopRoundWithProblems();
     }
 
     @Test
@@ -292,7 +292,7 @@ class FeedbackServiceTest {
         Topic currentTopic = new Topic("3주차_주제", 3);
         Round closedRound = new Round(currentTopic, LocalDate.of(2026, 7, 6),
                 LocalDateTime.of(2026, 7, 6, 0, 0), LocalDateTime.of(2026, 7, 7, 0, 0));
-        when(roundRepository.findTopByCloseAtLessThanEqualOrderByCloseAtDesc(any()))
+        when(roundRepository.findTopClosedRoundWithProblems(any()))
                 .thenReturn(Optional.of(closedRound));
         when(topicRepository.findByTopicOrder(4)).thenReturn(Optional.empty());
 
@@ -300,7 +300,7 @@ class FeedbackServiceTest {
                 .aggregateStats(1L, Period.WEEKLY);
 
         assertThat(stats.nextTopic()).isNull();
-        verify(roundRepository, never()).findTopByOrderByRoundDateDesc();
+        verify(roundRepository, never()).findTopRoundWithProblems();
     }
 
     @Test
@@ -312,7 +312,7 @@ class FeedbackServiceTest {
         Topic currentTopic = new Topic("3주차_주제", 3);
         Round closedRound = new Round(currentTopic, LocalDate.of(2026, 7, 6),
                 LocalDateTime.of(2026, 7, 6, 0, 0), LocalDateTime.of(2026, 7, 7, 0, 0));
-        when(roundRepository.findTopByCloseAtLessThanEqualOrderByCloseAtDesc(any()))
+        when(roundRepository.findTopClosedRoundWithProblems(any()))
                 .thenReturn(Optional.of(closedRound));
         when(topicRepository.findByTopicOrder(4)).thenReturn(Optional.of(new Topic("4주차_주제", 4)));
 
@@ -320,7 +320,7 @@ class FeedbackServiceTest {
                 .aggregateStats(1L, Period.WEEKLY);
 
         assertThat(stats.nextTopic()).isEqualTo("4주차_주제");
-        verify(roundRepository, never()).findTopByOrderByRoundDateDesc();
+        verify(roundRepository, never()).findTopRoundWithProblems();
     }
 
     @Test
@@ -332,7 +332,7 @@ class FeedbackServiceTest {
         Topic currentTopic = new Topic("8주차_주제", 8);
         Round closedRound = new Round(currentTopic, LocalDate.of(2026, 7, 6),
                 LocalDateTime.of(2026, 7, 6, 0, 0), LocalDateTime.of(2026, 7, 7, 0, 0));
-        when(roundRepository.findTopByCloseAtLessThanEqualOrderByCloseAtDesc(any()))
+        when(roundRepository.findTopClosedRoundWithProblems(any()))
                 .thenReturn(Optional.of(closedRound));
         when(topicRepository.findByTopicOrder(1)).thenReturn(Optional.of(new Topic("1주차_주제", 1)));
 
@@ -342,13 +342,13 @@ class FeedbackServiceTest {
         assertThat(stats.nextTopic()).isEqualTo("1주차_주제");
         verify(topicRepository).findByTopicOrder(1);
         verify(topicRepository, never()).findByTopicOrder(9);
-        verify(roundRepository, never()).findTopByOrderByRoundDateDesc();
+        verify(roundRepository, never()).findTopRoundWithProblems();
     }
 
     /**
      * 회귀 테스트: RoundSchedulerService가 23시에 미리 만들어 두는 "아직 안 끝난 익일 라운드"가
      * DB에 함께 있어도, resolveNextTopic이 그 라운드가 아니라 마감된 라운드(topicOrder 3) 기준으로
-     * 다음 주제를 계산해야 한다. findTopByOrderByRoundDateDesc로 되돌아가면(회귀) 미래 라운드
+     * 다음 주제를 계산해야 한다. findTopRoundWithProblems로 되돌아가면(회귀) 미래 라운드
      * (topicOrder 4)가 최신으로 잡혀 next=5가 되고, findByTopicOrder(5)는 스텁돼 있지 않으므로
      * nextTopic이 null로 어긋나 이 테스트가 실패한다.
      */
@@ -367,17 +367,17 @@ class FeedbackServiceTest {
         Round futureRound = new Round(futureTopic, LocalDate.of(2026, 7, 9),
                 LocalDateTime.of(2026, 7, 9, 0, 0), LocalDateTime.of(2026, 7, 9, 23, 59, 59));
 
-        when(roundRepository.findTopByCloseAtLessThanEqualOrderByCloseAtDesc(any()))
+        when(roundRepository.findTopClosedRoundWithProblems(any()))
                 .thenReturn(Optional.of(closedRound));
         // 회귀 시 호출될 구 메서드 — 미래 라운드를 리턴하도록 해서, 만약 프로덕션 코드가 이걸로
         // 되돌아가면 next=5가 되어 아래 findByTopicOrder(4) 스텁을 못 타고 테스트가 실패하게 만든다.
-        when(roundRepository.findTopByOrderByRoundDateDesc()).thenReturn(Optional.of(futureRound));
+        when(roundRepository.findTopRoundWithProblems()).thenReturn(Optional.of(futureRound));
         when(topicRepository.findByTopicOrder(4)).thenReturn(Optional.of(new Topic("4주차_주제", 4)));
 
         PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
                 .aggregateStats(1L, Period.WEEKLY);
 
         assertThat(stats.nextTopic()).isEqualTo("4주차_주제");
-        verify(roundRepository, never()).findTopByOrderByRoundDateDesc();
+        verify(roundRepository, never()).findTopRoundWithProblems();
     }
 }

@@ -37,6 +37,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 
 @ExtendWith(MockitoExtension.class)
@@ -83,7 +84,7 @@ class RoundSchedulerServiceTest {
     /** 최초 실행 가정(직전 라운드 없음) — nextTopicOrder=1로 계획을 세우는 공통 스텁. */
     private void stubFreshPlan() {
         when(roundRepository.findByRoundDate(TARGET_DATE)).thenReturn(Optional.empty());
-        when(roundRepository.findTopByOrderByRoundDateDesc()).thenReturn(Optional.empty());
+        when(roundRepository.findTopRoundWithProblems()).thenReturn(Optional.empty());
         when(topicRepository.findByTopicOrder(1)).thenReturn(Optional.of(topic()));
         when(aiGenerationLogRepository.findTop30BySubtypeIsNotNullOrderByCreatedAtDesc()).thenReturn(List.of());
         when(problemRepository.findTop20ByOrderByCreatedAtDesc()).thenReturn(List.of());
@@ -174,9 +175,54 @@ class RoundSchedulerServiceTest {
     }
 
     @Test
-    void roundAlreadyExists_skipsWithoutCallingGenerator() {
-        Round existing = new Round(topic(), TARGET_DATE, TARGET_DATE.atStartOfDay(), TARGET_DATE.atTime(23, 59, 59));
-        when(roundRepository.findByRoundDate(TARGET_DATE)).thenReturn(Optional.of(existing));
+    void nextTopic_isBasedOnLatestRoundWithProblems_notOnEmptyFailedRound() {
+        // 리포지토리가 빈 실패 회차를 제외하고 "문제 있는 마지막 회차(topicOrder=3)"를 돌려주는 상황.
+        // 빈 회차(topicOrder=4)가 기준이었다면 5가 조회됐을 것 — 4가 조회돼야 토픽이 건너뛰어지지 않은 것.
+        when(roundRepository.findByRoundDate(TARGET_DATE)).thenReturn(Optional.empty());
+        when(roundRepository.findTopRoundWithProblems()).thenReturn(Optional.of(
+                new Round(new Topic("배열", 3), TARGET_DATE.minusDays(2),
+                        TARGET_DATE.minusDays(2).atStartOfDay(), TARGET_DATE.minusDays(2).atTime(23, 59, 59))));
+        when(topicRepository.findByTopicOrder(4)).thenReturn(Optional.of(new Topic("구현", 4)));
+        when(aiGenerationLogRepository.findTop30BySubtypeIsNotNullOrderByCreatedAtDesc()).thenReturn(List.of());
+        when(problemRepository.findTop20ByOrderByCreatedAtDesc()).thenReturn(List.of());
+        when(problemGenerator.generate(any())).thenReturn(new GenerationOutcome(nineSuccesses()));
+
+        schedulerService.triggerRoundGeneration();
+
+        verify(topicRepository).findByTopicOrder(4);
+        verify(topicRepository, never()).findByTopicOrder(5);
+    }
+
+    private Round existingRound(boolean active) {
+        Round round = new Round(topic(), TARGET_DATE, TARGET_DATE.atStartOfDay(), TARGET_DATE.atTime(23, 59, 59));
+        ReflectionTestUtils.setField(round, "id", 5L);
+        if (active) {
+            round.activate();
+        }
+        return round;
+    }
+
+    private List<GenerationItem> nineFailures() {
+        List<GenerationItem> items = new ArrayList<>();
+        for (int i = 0; i < 9; i++) {
+            items.add(GenerationItem.failure(com.cocky.cockyserver.ai.dto.Language.JAVA,
+                    com.cocky.cockyserver.ai.dto.Difficulty.EASY, 1, "크레딧 소진"));
+        }
+        return items;
+    }
+
+    private List<GenerationItem> nineSuccesses() {
+        List<GenerationItem> items = new ArrayList<>();
+        for (int i = 0; i < 9; i++) {
+            items.add(successItem(com.cocky.cockyserver.ai.dto.Language.PYTHON,
+                    com.cocky.cockyserver.ai.dto.Difficulty.EASY));
+        }
+        return items;
+    }
+
+    @Test
+    void activeRoundAlreadyExists_skipsWithoutCallingGenerator() {
+        when(roundRepository.findByRoundDate(TARGET_DATE)).thenReturn(Optional.of(existingRound(true)));
 
         RoundGenerationResult result = schedulerService.triggerRoundGeneration();
 
@@ -186,5 +232,84 @@ class RoundSchedulerServiceTest {
         assertEquals(0, result.failureCount());
         verify(problemGenerator, never()).generate(any());
         verify(roundRepository, never()).save(any());
+    }
+
+    @Test
+    void inactiveRoundWithProblems_skipsWithoutCallingGenerator() {
+        Round existing = existingRound(false);
+        when(roundRepository.findByRoundDate(TARGET_DATE)).thenReturn(Optional.of(existing));
+        when(problemRepository.existsByRoundId(5L)).thenReturn(true);
+
+        RoundGenerationResult result = schedulerService.triggerRoundGeneration();
+
+        assertTrue(result.skipped());
+        verify(problemGenerator, never()).generate(any());
+        assertFalse(existing.isActive());
+    }
+
+    @Test
+    void allFail_savesInactiveRoundAndNineFailureLogs() {
+        stubFreshPlan();
+        when(problemGenerator.generate(any())).thenReturn(new GenerationOutcome(nineFailures()));
+
+        RoundGenerationResult result = schedulerService.triggerRoundGeneration();
+
+        assertTrue(result.skipped());
+        assertEquals("전체 문제 생성 실패", result.reason());
+        assertEquals(0, result.successCount());
+        assertEquals(9, result.failureCount());
+
+        ArgumentCaptor<Round> roundCaptor = ArgumentCaptor.forClass(Round.class);
+        verify(roundRepository).save(roundCaptor.capture());
+        assertFalse(roundCaptor.getValue().isActive());
+
+        ArgumentCaptor<AiGenerationLog> logCaptor = ArgumentCaptor.forClass(AiGenerationLog.class);
+        verify(aiGenerationLogRepository, times(9)).save(logCaptor.capture());
+        for (int i = 0; i < 9; i++) {
+            assertEquals(i + 1, logCaptor.getAllValues().get(i).getSequenceNo());
+            assertEquals(GenerationStatus.FAILED, logCaptor.getAllValues().get(i).getStatus());
+        }
+        verify(problemRepository, never()).save(any());
+    }
+
+    @Test
+    void retriggerSameDay_reusesEmptyInactiveRoundAndActivatesOnSuccess() {
+        Round existing = existingRound(false);
+        when(roundRepository.findByRoundDate(TARGET_DATE)).thenReturn(Optional.of(existing));
+        when(problemRepository.existsByRoundId(5L)).thenReturn(false);
+        when(roundRepository.findById(5L)).thenReturn(Optional.of(existing));
+        when(aiGenerationLogRepository.findTop30BySubtypeIsNotNullOrderByCreatedAtDesc()).thenReturn(List.of());
+        when(problemRepository.findTop20ByOrderByCreatedAtDesc()).thenReturn(List.of());
+        when(problemGenerator.generate(any())).thenReturn(new GenerationOutcome(nineSuccesses()));
+
+        RoundGenerationResult result = schedulerService.triggerRoundGeneration();
+
+        assertFalse(result.skipped());
+        assertEquals(9, result.successCount());
+        assertTrue(existing.isActive());
+        verify(roundRepository, never()).save(any());
+        // 이전 실패 로그는 지우지 않는다 — 새 시도 로그만 추가
+        verify(aiGenerationLogRepository, never()).deleteAll();
+        verify(aiGenerationLogRepository, never()).deleteById(any());
+        verify(aiGenerationLogRepository, times(9)).save(any(AiGenerationLog.class));
+    }
+
+    @Test
+    void retriggerSameDay_allFailAgain_staysInactiveAndAddsNineMoreLogs() {
+        Round existing = existingRound(false);
+        when(roundRepository.findByRoundDate(TARGET_DATE)).thenReturn(Optional.of(existing));
+        when(problemRepository.existsByRoundId(5L)).thenReturn(false);
+        when(roundRepository.findById(5L)).thenReturn(Optional.of(existing));
+        when(aiGenerationLogRepository.findTop30BySubtypeIsNotNullOrderByCreatedAtDesc()).thenReturn(List.of());
+        when(problemRepository.findTop20ByOrderByCreatedAtDesc()).thenReturn(List.of());
+        when(problemGenerator.generate(any())).thenReturn(new GenerationOutcome(nineFailures()));
+
+        RoundGenerationResult result = schedulerService.triggerRoundGeneration();
+
+        assertTrue(result.skipped());
+        assertEquals(9, result.failureCount());
+        assertFalse(existing.isActive());
+        verify(roundRepository, never()).save(any());
+        verify(aiGenerationLogRepository, times(9)).save(any(AiGenerationLog.class));
     }
 }
