@@ -26,6 +26,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -174,6 +175,13 @@ public class GlobalExceptionHandler {
         String message = "요청 값이 올바르지 않습니다: %s=%s".formatted(e.getName(), e.getValue());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse("INVALID_REQUEST", message));
+    }
+
+    /** 필수 @RequestParam 누락(예: /rankings의 period/scope) — Spring 기본 400 대신 {code, message}로 통일. */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParameter(MissingServletRequestParameterException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse("INVALID_REQUEST", "필수 파라미터 '%s'가 없습니다.".formatted(e.getParameterName())));
     }
 
     @ExceptionHandler(TopicNotFoundException.class)
