@@ -1,6 +1,6 @@
 package com.cocky.cockyserver.domain.feedback.controller;
 
-import com.cocky.cockyserver.ai.dto.Period;
+import com.cocky.cockyserver.domain.feedback.FeedbackPeriod;
 import com.cocky.cockyserver.domain.feedback.dto.PeriodFeedbackResponse;
 import com.cocky.cockyserver.domain.feedback.service.FeedbackService;
 import com.cocky.cockyserver.global.security.UserPrincipal;
@@ -21,7 +21,7 @@ public class FeedbackController {
 
     @GetMapping("/periodic")
     public ResponseEntity<PeriodFeedbackResponse> getPeriodicFeedback(
-            @AuthenticationPrincipal UserPrincipal principal, @RequestParam Period period) {
+            @AuthenticationPrincipal UserPrincipal principal, @RequestParam FeedbackPeriod period) {
         return ResponseEntity.ok(PeriodFeedbackResponse.from(
                 feedbackService.getPeriodicFeedbackWithStats(principal.userId(), period)));
     }

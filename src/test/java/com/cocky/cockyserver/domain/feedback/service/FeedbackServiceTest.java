@@ -10,9 +10,9 @@ import static org.mockito.Mockito.when;
 
 import com.cocky.cockyserver.ai.dto.Difficulty;
 import com.cocky.cockyserver.ai.dto.Language;
-import com.cocky.cockyserver.ai.dto.Period;
 import com.cocky.cockyserver.ai.dto.PeriodStats;
 import com.cocky.cockyserver.ai.port.PeriodFeedbackProvider;
+import com.cocky.cockyserver.domain.feedback.FeedbackPeriod;
 import com.cocky.cockyserver.domain.round.entity.Round;
 import com.cocky.cockyserver.domain.round.repository.RoundRepository;
 import com.cocky.cockyserver.domain.submission.entity.Verdict;
@@ -52,15 +52,15 @@ class FeedbackServiceTest {
 
     /** 주어진 시각(now)에 WEEKLY 집계를 호출했을 때 실제로 쓰인 [start, end)를 반환한다. */
     private LocalDateTime[] weeklyWindow(LocalDateTime now) {
-        return window(now, Period.WEEKLY);
+        return window(now, FeedbackPeriod.WEEKLY);
     }
 
     /** 주어진 시각(now)에 MONTHLY 집계를 호출했을 때 실제로 쓰인 [start, end)를 반환한다. */
     private LocalDateTime[] monthlyWindow(LocalDateTime now) {
-        return window(now, Period.MONTHLY);
+        return window(now, FeedbackPeriod.MONTHLY);
     }
 
-    private LocalDateTime[] window(LocalDateTime now, Period period) {
+    private LocalDateTime[] window(LocalDateTime now, FeedbackPeriod period) {
         SubmissionRepository submissionRepository = mock(SubmissionRepository.class);
         RoundRepository roundRepository = mock(RoundRepository.class);
         // nextTopic 계산(WEEKLY/MONTHLY 공통 경로)이 라운드를 조회하므로, 이 테스트의 관심사인
@@ -187,7 +187,7 @@ class FeedbackServiceTest {
         when(roundRepository.findTopRoundWithProblems()).thenReturn(Optional.empty());
 
         PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
-                .aggregateStats(1L, Period.WEEKLY);
+                .aggregateStats(1L, FeedbackPeriod.WEEKLY);
 
         assertThat(stats.languageCounts()).containsExactlyInAnyOrderEntriesOf(
                 Map.of(Language.PYTHON, 3, Language.C, 1, Language.JAVA, 2));
@@ -208,7 +208,7 @@ class FeedbackServiceTest {
         when(roundRepository.findTopRoundWithProblems()).thenReturn(Optional.empty());
 
         PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
-                .aggregateStats(1L, Period.WEEKLY);
+                .aggregateStats(1L, FeedbackPeriod.WEEKLY);
 
         assertThat(stats.difficultyCounts()).containsExactlyInAnyOrderEntriesOf(
                 Map.of(Difficulty.EASY, 4, Difficulty.NORMAL, 5, Difficulty.HARD, 1));
@@ -226,7 +226,7 @@ class FeedbackServiceTest {
         when(roundRepository.findTopRoundWithProblems()).thenReturn(Optional.empty());
 
         PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
-                .aggregateStats(1L, Period.WEEKLY);
+                .aggregateStats(1L, FeedbackPeriod.WEEKLY);
 
         assertThat(stats.wrongTypeCounts()).containsExactlyInAnyOrderEntriesOf(Map.of("WA", 2, "TLE", 1));
     }
@@ -240,7 +240,7 @@ class FeedbackServiceTest {
         when(roundRepository.findTopRoundWithProblems()).thenReturn(Optional.empty());
 
         PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
-                .aggregateStats(1L, Period.WEEKLY);
+                .aggregateStats(1L, FeedbackPeriod.WEEKLY);
 
         assertThat(stats.languageCounts()).isEmpty();
         assertThat(stats.difficultyCounts()).isEmpty();
@@ -262,7 +262,7 @@ class FeedbackServiceTest {
                 .thenReturn(Optional.of(closedRound));
 
         PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
-                .aggregateStats(1L, Period.ROUND);
+                .aggregateStats(1L, FeedbackPeriod.ROUND);
 
         assertThat(stats.nextTopic()).isNull();
         verify(roundRepository, never()).findTopRoundWithProblems();
@@ -277,7 +277,7 @@ class FeedbackServiceTest {
         when(roundRepository.findTopClosedRoundWithProblems(any())).thenReturn(Optional.empty());
 
         PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
-                .aggregateStats(1L, Period.WEEKLY);
+                .aggregateStats(1L, FeedbackPeriod.WEEKLY);
 
         assertThat(stats.nextTopic()).isNull();
         verify(roundRepository, never()).findTopRoundWithProblems();
@@ -297,7 +297,7 @@ class FeedbackServiceTest {
         when(topicRepository.findByTopicOrder(4)).thenReturn(Optional.empty());
 
         PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
-                .aggregateStats(1L, Period.WEEKLY);
+                .aggregateStats(1L, FeedbackPeriod.WEEKLY);
 
         assertThat(stats.nextTopic()).isNull();
         verify(roundRepository, never()).findTopRoundWithProblems();
@@ -317,7 +317,7 @@ class FeedbackServiceTest {
         when(topicRepository.findByTopicOrder(4)).thenReturn(Optional.of(new Topic("4주차_주제", 4)));
 
         PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
-                .aggregateStats(1L, Period.WEEKLY);
+                .aggregateStats(1L, FeedbackPeriod.WEEKLY);
 
         assertThat(stats.nextTopic()).isEqualTo("4주차_주제");
         verify(roundRepository, never()).findTopRoundWithProblems();
@@ -337,7 +337,7 @@ class FeedbackServiceTest {
         when(topicRepository.findByTopicOrder(1)).thenReturn(Optional.of(new Topic("1주차_주제", 1)));
 
         PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
-                .aggregateStats(1L, Period.WEEKLY);
+                .aggregateStats(1L, FeedbackPeriod.WEEKLY);
 
         assertThat(stats.nextTopic()).isEqualTo("1주차_주제");
         verify(topicRepository).findByTopicOrder(1);
@@ -375,9 +375,27 @@ class FeedbackServiceTest {
         when(topicRepository.findByTopicOrder(4)).thenReturn(Optional.of(new Topic("4주차_주제", 4)));
 
         PeriodStats stats = newService(submissionRepository, roundRepository, topicRepository)
-                .aggregateStats(1L, Period.WEEKLY);
+                .aggregateStats(1L, FeedbackPeriod.WEEKLY);
 
         assertThat(stats.nextTopic()).isEqualTo("4주차_주제");
         verify(roundRepository, never()).findTopRoundWithProblems();
+    }
+
+    @Test
+    void AI_포트에는_FeedbackPeriod가_이름이_같은_ai_Period로_변환되어_넘어간다() {
+        for (FeedbackPeriod period : FeedbackPeriod.values()) {
+            SubmissionRepository submissionRepository = mock(SubmissionRepository.class);
+            RoundRepository roundRepository = mock(RoundRepository.class);
+            TopicRepository topicRepository = mock(TopicRepository.class);
+            PeriodFeedbackProvider provider = mock(PeriodFeedbackProvider.class);
+            Clock clock = Clock.fixed(FIXED_NOW.atZone(TEST_ZONE).toInstant(), TEST_ZONE);
+            FeedbackService service = new FeedbackService(
+                    submissionRepository, roundRepository, topicRepository, provider, clock);
+
+            service.getPeriodicFeedbackWithStats(1L, period);
+
+            // API enum이 아니라 AI 모듈 계약 타입(ai.dto.Period)이 포트에 넘어가야 한다.
+            verify(provider).summarize(eq(com.cocky.cockyserver.ai.dto.Period.valueOf(period.name())), any());
+        }
     }
 }
