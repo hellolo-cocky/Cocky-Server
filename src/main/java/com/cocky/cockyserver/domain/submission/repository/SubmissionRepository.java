@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -17,7 +18,45 @@ import org.springframework.data.repository.query.Param;
 
 public interface SubmissionRepository extends JpaRepository<Submission, Long> {
 
-    Page<Submission> findByUserId(Long userId, Pageable pageable);
+    /**
+     * 내 풀이 기록 목록. 문제 제목·난이도까지 join 한 번으로 프로젝션해 가져온다 — 엔티티를 읽고
+     * DTO 변환 시 {@code problem}을 건드리면 제출마다 problem 조회가 나가는 N+1이 된다.
+     * 정렬은 쿼리에 고정(최신순, 동시각이면 id 역순)하고 호출부는 정렬 없는 Pageable만 넘긴다.
+     * PENDING도 기록에는 그대로 보여준다(오답 집계의 PENDING 제외 규칙과 별개).
+     */
+    @Query(value = "select s.id as submissionId, p.id as problemId, p.title as problemTitle, "
+            + "p.difficulty as difficulty, s.language as language, s.verdict as verdict, s.score as score, "
+            + "s.timeScore as timeScore, s.readabilityScore as readabilityScore, "
+            + "s.originalityScore as originalityScore, s.submittedAt as submittedAt "
+            + "from Submission s join s.problem p where s.user.id = :userId "
+            + "order by s.submittedAt desc, s.id desc",
+            countQuery = "select count(s) from Submission s where s.user.id = :userId")
+    Page<SubmissionHistoryRow> findHistoryByUserId(@Param("userId") Long userId, Pageable pageable);
+
+    /**
+     * 본인 제출 상세. 소유자 조건을 쿼리에 넣어 "없는 제출"과 "남의 제출"을 구분할 수 없게 한다
+     * (존재 여부 노출 방지 — 둘 다 빈 결과). problem은 fetch join으로 한 번에 가져온다.
+     */
+    @Query("select s from Submission s join fetch s.problem "
+            + "where s.id = :submissionId and s.user.id = :userId")
+    Optional<Submission> findDetailByIdAndUserId(
+            @Param("submissionId") Long submissionId, @Param("userId") Long userId);
+
+    Optional<Submission> findByIdAndUserId(Long id, Long userId);
+
+    interface SubmissionHistoryRow {
+        Long getSubmissionId();
+        Long getProblemId();
+        String getProblemTitle();
+        Difficulty getDifficulty();
+        Language getLanguage();
+        Verdict getVerdict();
+        BigDecimal getScore();
+        BigDecimal getTimeScore();
+        BigDecimal getReadabilityScore();
+        BigDecimal getOriginalityScore();
+        LocalDateTime getSubmittedAt();
+    }
 
     /**
      * 같은 (user, problem)의 기존 is_latest=true 제출을 전부 false로 뒤집는다. 조회 후
