@@ -89,6 +89,47 @@ class JudgeConfigTest {
         contextRunner.withPropertyValues("judge.engine=docker").run(context -> assertThat(context).hasFailed());
     }
 
+    @Test
+    void prod에서_engine_미설정이면_기동_실패한다() {
+        contextRunner.withPropertyValues("spring.profiles.active=prod").run(context -> {
+            assertThat(context).hasFailed();
+            assertThat(context.getStartupFailure()).hasRootCauseMessage(
+                    "prod 환경에서는 JUDGE_ENGINE을 runner 또는 judge0로 설정해야 합니다 (현재: stub 또는 미설정 — stub 불가).");
+        });
+    }
+
+    @Test
+    void prod에서_engine_stub이면_기동_실패한다() {
+        contextRunner.withPropertyValues("spring.profiles.active=prod", "judge.engine=stub")
+                .run(context -> assertThat(context).hasFailed());
+    }
+
+    @Test
+    void prod에서_judge0인데_url이_비면_기동_실패한다() {
+        contextRunner.withPropertyValues("spring.profiles.active=prod", "judge.engine=judge0", "judge0.url=")
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure()).hasRootCauseMessage(
+                            "prod 환경에서 judge.engine=judge0이면 JUDGE0_URL을 설정해야 합니다 (stub 폴백 불가).");
+                });
+    }
+
+    @Test
+    void prod에서_judge0과_url이_있으면_정상_기동한다() {
+        contextRunner.withPropertyValues(
+                        "spring.profiles.active=prod", "judge.engine=judge0", "judge0.url=http://localhost:2358")
+                .run(context -> assertThat(context.getBean(JudgeService.class)).isInstanceOf(Judge0Adapter.class));
+    }
+
+    @Test
+    void prod에서_runner와_url_token이_있으면_정상_기동한다() {
+        contextRunner.withPropertyValues(
+                        "spring.profiles.active=prod", "judge.engine=runner",
+                        "runner.url=http://localhost:8081", "runner.token=t")
+                .run(context -> assertThat(context.getBean(JudgeService.class))
+                        .isInstanceOf(RunnerJudgeAdapter.class));
+    }
+
     /** 사용하지 않는 엔진 구현체(특히 스텁 기동 배너)가 eager 생성되면 안 된다. */
     @Test
     void 선택되지_않은_구현체는_생성되지_않는다() {

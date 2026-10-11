@@ -47,6 +47,7 @@ auth:
 
 # 채점 엔진 선택: judge0 | runner | stub. 기본 stub(항상 가짜 결과 — 채점 VM이 없는 환경용).
 # runner면 runner.url/token 필수(비면 기동 실패). judge0면 judge0.url이 비었을 때 stub으로 폴백한다.
+# prod 프로필에서는 stub(미설정 포함)·judge0 URL 누락 폴백 모두 기동 실패.
 # time/memory 제한은 problem별 컬럼이 생기기 전까지 쓰는 엔진 공통 전역 기본값.
 judge:
   engine: ${JUDGE_ENGINE:stub}
