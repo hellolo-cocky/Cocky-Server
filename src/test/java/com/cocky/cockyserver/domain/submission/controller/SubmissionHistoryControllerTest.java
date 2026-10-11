@@ -168,15 +168,23 @@ class SubmissionHistoryControllerTest {
     }
 
     @Test
-    void 기존_경로와_feedback도_타인_제출이면_404다() throws Exception {
+    void feedback도_타인_제출이면_404다() throws Exception {
         Submission others = persistSubmission(other, Verdict.AC, 1);
 
-        mockMvc.perform(get("/api/v1/submissions/{id}", others.getId())
-                        .header(HttpHeaders.AUTHORIZATION, bearer))
-                .andExpect(status().isNotFound());
         mockMvc.perform(get("/api/v1/submissions/{id}/feedback", others.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SUBMISSION_NOT_FOUND"));
+    }
+
+    @Test
+    void 본인_제출이어도_옛_경로_submissions_id는_더_이상_없다() throws Exception {
+        Submission mine = persistSubmission(me, Verdict.AC, 1);
+
+        // 상세는 /me/{id}로 일원화 — 옛 경로는 본인 제출이어도 200이 나오면 안 된다.
+        mockMvc.perform(get("/api/v1/submissions/{id}", mine.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer))
+                .andExpect(status().is4xxClientError());
     }
 
     @Test

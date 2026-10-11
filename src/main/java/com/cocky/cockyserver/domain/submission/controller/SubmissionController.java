@@ -42,8 +42,7 @@ public class SubmissionController {
         return ResponseEntity.ok(submissionService.getMySubmissions(principal.userId(), pageable));
     }
 
-    /** {@code /{submissionId}}와 같은 응답 — 기록 목록과 경로 모양을 맞춘 별칭. 프론트 이관 후 하나로 정리할 것. */
-    @GetMapping({"/me/{submissionId}", "/{submissionId}"})
+    @GetMapping("/me/{submissionId}")
     public ResponseEntity<SubmissionDetailResponse> getSubmission(
             @AuthenticationPrincipal UserPrincipal principal, @PathVariable Long submissionId) {
         return ResponseEntity.ok(submissionService.getSubmissionDetail(principal.userId(), submissionId));
