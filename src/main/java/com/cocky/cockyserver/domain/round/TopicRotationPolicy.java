@@ -1,7 +1,7 @@
 package com.cocky.cockyserver.domain.round;
 
 /**
- * 주제(topic.week_order 컬럼, 코드상 topicOrder) 순환 규칙. 총 8개 주제가 회차마다 순차로
+ * 주제(topic.topic_order 컬럼, 코드상 topicOrder) 순환 규칙. 총 8개 주제가 회차마다 순차로
  * 순환하며, 8번째 다음은 1번으로 돌아간다.
  *
  * <p>⚠️ "주간"이 아니라 "회차별" 순환이다 — 스케줄러가 매일(일요일 제외) 회차를 생성할 때마다
