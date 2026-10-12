@@ -20,6 +20,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Scope;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.web.client.RestClient;
 
 /**
@@ -30,6 +32,9 @@ import org.springframework.web.client.RestClient;
  *   <li>{@code judge0}: Judge0. judge0.url이 비어 있으면 스텁으로 폴백(기존 동작).</li>
  *   <li>{@code stub}(기본): 항상 가짜 결과. 채점 VM이 없는 개발/데모 환경용.</li>
  * </ul>
+ *
+ * <p>{@code prod} 프로필에서는 stub(미설정 포함)과 judge0 URL 누락으로 인한 stub 폴백을 기동 실패로
+ * 막는다 — 운영에서 가짜 채점 결과가 조용히 나가는 것을 방지.
  *
  * <p>각 구현체 빈({@code Judge0Adapter}/{@code RunnerJudgeAdapter}/{@code StubJudgeService})은 자기
  * 설정 클래스가 {@code @Lazy}로 등록하고, 여기서는 {@link ObjectProvider}로 고른 하나만 실제로
@@ -61,11 +66,14 @@ public class JudgeConfig {
     public JudgeService judgeService(JudgeProperties judgeProperties,
                                      Judge0Properties judge0Properties,
                                      RunnerProperties runnerProperties,
+                                     Environment environment,
                                      ObjectProvider<Judge0Adapter> judge0AdapterProvider,
                                      ObjectProvider<RunnerJudgeAdapter> runnerAdapterProvider,
                                      ObjectProvider<StubJudgeService> stubProvider) {
         String engine = judgeProperties.engine() == null
                 ? "" : judgeProperties.engine().trim().toLowerCase(Locale.ROOT);
+
+        boolean prod = environment.acceptsProfiles(Profiles.of("prod"));
 
         return switch (engine) {
             case "runner" -> {
@@ -78,6 +86,10 @@ public class JudgeConfig {
             }
             case "judge0" -> {
                 if (isBlank(judge0Properties.url())) {
+                    if (prod) {
+                        throw new IllegalStateException(
+                                "prod 환경에서 judge.engine=judge0이면 JUDGE0_URL을 설정해야 합니다 (stub 폴백 불가).");
+                    }
                     log.warn("judge.engine=judge0이지만 JUDGE0_URL 미설정 — StubJudgeService로 폴백합니다.");
                     yield stubProvider.getObject();
                 }
@@ -85,6 +97,11 @@ public class JudgeConfig {
                 yield judge0AdapterProvider.getObject();
             }
             case "stub", "" -> {
+                if (prod) {
+                    throw new IllegalStateException(
+                            "prod 환경에서는 JUDGE_ENGINE을 runner 또는 judge0로 설정해야 합니다 "
+                                    + "(현재: stub 또는 미설정 — stub 불가).");
+                }
                 log.warn("채점 엔진: StubJudgeService (judge.engine={})", engine.isEmpty() ? "(미설정)" : engine);
                 yield stubProvider.getObject();
             }
