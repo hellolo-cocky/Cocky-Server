@@ -10,6 +10,7 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.time.Duration;
 import java.util.List;
@@ -63,6 +64,25 @@ public class OpenAiClient {
                 .build();
     }
 
+    /**
+     * 재시도해도 소용없는 오류인지 판별한다.
+     * 401(키 오류)과 429 중 insufficient_quota/credit_balance_exhausted(크레딧 소진)만 재시도 불가.
+     * 일반 429(rate limit)·5xx·타임아웃은 재시도 가능.
+     */
+    static boolean isRetryable(RestClientException e) {
+        if (e instanceof RestClientResponseException re) {
+            int status = re.getStatusCode().value();
+            if (status == 401) {
+                return false;
+            }
+            if (status == 429) {
+                String body = re.getResponseBodyAsString();
+                return !(body.contains("insufficient_quota") || body.contains("credit_balance_exhausted"));
+            }
+        }
+        return true;
+    }
+
     /** JSON 객체 응답 강제(문제 생성 등 구조화 출력용). content(JSON 문자열) 반환. */
     public String chatJson(String model, String systemPrompt, String userPrompt) {
         return chat(model, systemPrompt, userPrompt, true);
@@ -93,9 +113,10 @@ public class OpenAiClient {
                     .retrieve()
                     .body(JsonNode.class);
         } catch (RestClientException e) {
-            // 401/429/5xx/타임아웃 등 — 호출부(오케스트레이터)가 OpenAiException 하나로 재시도 판단.
-            log.warn("OpenAI 호출 실패(model={}): {}", model, e.getMessage());
-            throw new OpenAiException("OpenAI 호출 실패: " + e.getMessage(), e);
+            // 401/429/5xx/타임아웃 등 — 호출부(오케스트레이터)가 OpenAiException.isRetryable()로 재시도 판단.
+            boolean retryable = isRetryable(e);
+            log.warn("OpenAI 호출 실패(model={}, retryable={}): {}", model, retryable, e.getMessage());
+            throw new OpenAiException("OpenAI 호출 실패: " + e.getMessage(), e, retryable);
         }
 
         if (response == null || !response.has("choices") || response.get("choices").isEmpty()) {

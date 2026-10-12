@@ -41,7 +41,7 @@ public class TopicService {
         try {
             return roundService.getCurrentActiveRound();
         } catch (RoundNotFoundException e) {
-            return roundRepository.findTopByOrderByRoundDateDesc()
+            return roundRepository.findTopRoundWithProblems()
                     .orElseThrow(() -> new TopicNotFoundException("등록된 회차가 없어 주제를 조회할 수 없습니다."));
         }
     }

@@ -113,7 +113,7 @@ public class FeedbackService {
      */
     private Optional<PeriodWindow> resolveWindow(Period period, LocalDateTime now) {
         return switch (period) {
-            case ROUND -> roundRepository.findTopByCloseAtLessThanEqualOrderByCloseAtDesc(now)
+            case ROUND -> roundRepository.findTopClosedRoundWithProblems(now)
                     .map(r -> new PeriodWindow(r.getOpenAt(), r.getCloseAt()));
             case WEEKLY -> {
                 LocalDate saturday = now.toLocalDate().with(TemporalAdjusters.previous(DayOfWeek.SATURDAY));
@@ -134,8 +134,8 @@ public class FeedbackService {
      * {@link TopicRotationPolicy#next}(회차 스케줄러와 공유하는 도메인 규칙)로 다음 순번을 구한 뒤
      * topic 이름을 찾는다.
      *
-     * <p>{@code findTopByOrderByRoundDateDesc}(마감 여부 무관, 단순 최신)가 아니라
-     * {@code findTopByCloseAtLessThanEqualOrderByCloseAtDesc}를 쓴다 — {@code resolveWindow}의
+     * <p>{@code findTopRoundWithProblems}(마감 여부 무관, 단순 최신)가 아니라
+     * {@code findTopClosedRoundWithProblems}를 쓴다 — {@code resolveWindow}의
      * ROUND 분기, 랭킹 배치와 같은 기준이다. {@code RoundSchedulerService}가 23시에 익일 라운드를
      * {@code active=true}로 미리 만들어 두므로, 마감 여부를 안 보면 23시 이후엔 아직 시작도
      * 안 한 다음 라운드가 "최신"으로 잡혀 다음 주제가 한 주 더 밀리는 버그가 있었다.
@@ -144,7 +144,7 @@ public class FeedbackService {
         if (period == Period.ROUND) {
             return null;
         }
-        return roundRepository.findTopByCloseAtLessThanEqualOrderByCloseAtDesc(now)
+        return roundRepository.findTopClosedRoundWithProblems(now)
                 .map(latest -> TopicRotationPolicy.next(latest.getTopic().getTopicOrder()))
                 .flatMap(topicRepository::findByTopicOrder)
                 .map(Topic::getName)

@@ -27,6 +27,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -115,18 +116,29 @@ public class RoundSchedulerService {
 
     /** 오늘 라운드 중복 여부 확인, 다음 주제 결정, pastTypes/pastStatements 수집 — 짧은 읽기 트랜잭션. */
     private Plan planNextRound(LocalDate targetDate) {
-        if (roundRepository.findByRoundDate(targetDate).isPresent()) {
-            log.info("스케줄러: {} 라운드가 이미 존재 — 스킵", targetDate);
-            return null;
+        Optional<Round> existing = roundRepository.findByRoundDate(targetDate);
+        if (existing.isPresent()) {
+            Round round = existing.get();
+            // 재사용 판단: 비활성 + 문제 0개 = 이전 전체 실패로 남은 빈 회차. 그 외는 기존처럼 skip.
+            if (round.isActive() || problemRepository.existsByRoundId(round.getId())) {
+                log.info("스케줄러: {} 라운드가 이미 존재 — 스킵", targetDate);
+                return null;
+            }
+            log.info("스케줄러: {} 빈 비활성 회차(id={}) 재사용 — 문제 재생성", targetDate, round.getId());
+            return buildPlan(round.getTopic(), round.getId());
         }
 
-        int nextTopicOrder = roundRepository.findTopByOrderByRoundDateDesc()
+        int nextTopicOrder = roundRepository.findTopRoundWithProblems()
                 .map(prev -> TopicRotationPolicy.next(prev.getTopic().getTopicOrder()))
                 .orElse(1);
         Topic topic = topicRepository.findByTopicOrder(nextTopicOrder)
                 .orElseThrow(() -> new IllegalStateException(
                         "topicOrder=" + nextTopicOrder + "인 topic이 없습니다 — V5 시드 확인 필요"));
+        return buildPlan(topic, null);
+    }
 
+    /** reusedRoundId가 null이면 새 회차, 아니면 해당 빈 회차를 재사용하는 계획. */
+    private Plan buildPlan(Topic topic, Long reusedRoundId) {
         List<String> pastTypes = aiGenerationLogRepository.findTop30BySubtypeIsNotNullOrderByCreatedAtDesc().stream()
                 .map(AiGenerationLog::getSubtype)
                 .toList();
@@ -135,7 +147,7 @@ public class RoundSchedulerService {
                 .toList();
 
         String roundSubtype = pickRoundSubtype(topic.getName(), pastTypes);
-        return new Plan(topic, roundSubtype, pastTypes, pastStatements);
+        return new Plan(topic, roundSubtype, pastTypes, pastStatements, reusedRoundId);
     }
 
     private String pickRoundSubtype(String topicName, List<String> pastTypes) {
@@ -153,20 +165,30 @@ public class RoundSchedulerService {
     /** 회차 생성 + 문제/테스트케이스/생성로그 저장 — 짧은 쓰기 트랜잭션. */
     private RoundGenerationResult persist(LocalDate targetDate, Plan plan, GenerationOutcome outcome) {
         List<GenerationItem> items = outcome.items();
-        if (items.stream().noneMatch(GenerationItem::success)) {
-            log.error("스케줄러: {} 회차 문제 생성 전체 실패 — 회차를 생성하지 않음", targetDate);
-            return RoundGenerationResult.skipped(targetDate, "전체 문제 생성 실패");
-        }
+        boolean anySuccess = items.stream().anyMatch(GenerationItem::success);
 
-        LocalDateTime openAt = targetDate.atStartOfDay();
-        LocalDateTime closeAt = targetDate.atTime(23, 59, 59);
-        Round round = new Round(plan.topic(), targetDate, openAt, closeAt);
-        round.activate();
-        try {
-            roundRepository.save(round);
-        } catch (DataIntegrityViolationException e) {
-            log.info("스케줄러: {} 라운드 저장 중 유니크 제약 위반 — 동시 실행으로 이미 생성됨", targetDate);
-            return RoundGenerationResult.skipped(targetDate, "동시 실행으로 라운드가 이미 생성됨");
+        // 전체 실패여도 회차는 비활성으로 저장해 실패 로그(round_id NOT NULL)를 남긴다.
+        Round round;
+        if (plan.reusedRoundId() != null) {
+            // 영속 상태 엔티티를 다시 읽어 activate()가 커밋 시 반영되게 한다(planNextRound의 인스턴스는 분리됨).
+            round = roundRepository.findById(plan.reusedRoundId())
+                    .orElseThrow(() -> new IllegalStateException("재사용할 회차가 사라졌습니다: " + plan.reusedRoundId()));
+            if (anySuccess) {
+                round.activate();
+            }
+        } else {
+            LocalDateTime openAt = targetDate.atStartOfDay();
+            LocalDateTime closeAt = targetDate.atTime(23, 59, 59);
+            round = new Round(plan.topic(), targetDate, openAt, closeAt);
+            if (anySuccess) {
+                round.activate();
+            }
+            try {
+                roundRepository.save(round);
+            } catch (DataIntegrityViolationException e) {
+                log.info("스케줄러: {} 라운드 저장 중 유니크 제약 위반 — 동시 실행으로 이미 생성됨", targetDate);
+                return RoundGenerationResult.skipped(targetDate, "동시 실행으로 라운드가 이미 생성됨");
+            }
         }
 
         List<GenerationItem> failures = new ArrayList<>();
@@ -191,6 +213,10 @@ public class RoundSchedulerService {
                             .toList());
         }
 
+        if (!anySuccess) {
+            log.error("스케줄러: {} 회차 문제 생성 전체 실패 — 비활성 회차로 저장(실패 로그 {}건)", targetDate, failures.size());
+            return RoundGenerationResult.skipped(targetDate, "전체 문제 생성 실패", 0, failures.size());
+        }
         return RoundGenerationResult.completed(targetDate, successCount, failures.size());
     }
 
@@ -212,6 +238,8 @@ public class RoundSchedulerService {
                 AiGenerationLog.success(round, problem, sequenceNo, generated.subtype(), item.attempts()));
     }
 
-    private record Plan(Topic topic, String roundSubtype, List<String> pastTypes, List<String> pastStatements) {
+    /** reusedRoundId: 전체 실패로 남은 빈 비활성 회차를 재사용할 때만 non-null. */
+    private record Plan(Topic topic, String roundSubtype, List<String> pastTypes, List<String> pastStatements,
+                        Long reusedRoundId) {
     }
 }
