@@ -20,7 +20,6 @@ import com.cocky.cockyserver.domain.submission.entity.Submission;
 import com.cocky.cockyserver.domain.submission.entity.Verdict;
 import com.cocky.cockyserver.domain.submission.exception.LanguageMismatchException;
 import com.cocky.cockyserver.domain.submission.exception.RoundClosedException;
-import com.cocky.cockyserver.domain.submission.exception.SubmissionAccessDeniedException;
 import com.cocky.cockyserver.domain.submission.exception.SubmissionNotFoundException;
 import com.cocky.cockyserver.domain.submission.exception.TestCaseNotConfiguredException;
 import com.cocky.cockyserver.domain.submission.judge.JudgeRequest;
@@ -39,6 +38,7 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -59,6 +59,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class SubmissionService {
 
     private static final Logger log = LoggerFactory.getLogger(SubmissionService.class);
+
+    private static final int MAX_HISTORY_PAGE_SIZE = 100;
 
     private final ProblemRepository problemRepository;
     private final TestCaseRepository testCaseRepository;
@@ -204,32 +206,32 @@ public class SubmissionService {
         return timeScore.add(readabilityScore).add(originalityScore);
     }
 
+    /** 정렬은 쿼리에 고정돼 있어 클라이언트의 sort 파라미터는 버린다. size는 {@link #MAX_HISTORY_PAGE_SIZE}로 제한. */
     public Page<SubmissionSummaryResponse> getMySubmissions(Long userId, Pageable pageable) {
-        return submissionRepository.findByUserId(userId, pageable).map(SubmissionSummaryResponse::from);
+        Pageable unsorted = PageRequest.of(pageable.getPageNumber(),
+                Math.min(pageable.getPageSize(), MAX_HISTORY_PAGE_SIZE));
+        return submissionRepository.findHistoryByUserId(userId, unsorted).map(SubmissionSummaryResponse::from);
     }
 
     public SubmissionDetailResponse getSubmissionDetail(Long userId, Long submissionId) {
-        return SubmissionDetailResponse.from(findOwnedSubmission(userId, submissionId));
+        Submission submission = submissionRepository.findDetailByIdAndUserId(submissionId, userId)
+                .orElseThrow(() -> notFound(submissionId));
+        return SubmissionDetailResponse.from(submission);
     }
 
     /** 세 점수 컬럼이 하나라도 null이면 AI 피드백이 아직 준비되지 않은 것으로 보고 비운다 — 컨트롤러가 202로 처리. */
     public Optional<SubmissionFeedbackResponse> getFeedback(Long userId, Long submissionId) {
-        Submission submission = findOwnedSubmission(userId, submissionId);
-        if (submission.getTimeScore() == null || submission.getReadabilityScore() == null
-                || submission.getOriginalityScore() == null) {
+        Submission submission = submissionRepository.findByIdAndUserId(submissionId, userId)
+                .orElseThrow(() -> notFound(submissionId));
+        if (submission.aiScore() == null) {
             return Optional.empty();
         }
         return Optional.of(SubmissionFeedbackResponse.from(submission));
     }
 
-    private Submission findOwnedSubmission(Long userId, Long submissionId) {
-        Submission submission = submissionRepository.findById(submissionId)
-                .orElseThrow(() -> new SubmissionNotFoundException(
-                        "존재하지 않는 제출입니다. submissionId=" + submissionId));
-        if (!submission.getUser().getId().equals(userId)) {
-            throw new SubmissionAccessDeniedException("본인의 제출만 조회할 수 있습니다. submissionId=" + submissionId);
-        }
-        return submission;
+    /** 없는 제출과 남의 제출을 같은 404로 응답한다 — 제출 id의 존재 여부를 노출하지 않기 위해. */
+    private SubmissionNotFoundException notFound(Long submissionId) {
+        return new SubmissionNotFoundException("존재하지 않는 제출입니다. submissionId=" + submissionId);
     }
 
     private TestCaseIO toTestCaseIO(TestCase testCase) {
