@@ -14,7 +14,6 @@ import com.cocky.cockyserver.domain.round.exception.RoundNotFoundException;
 import com.cocky.cockyserver.domain.run.exception.RunRateLimitExceededException;
 import com.cocky.cockyserver.domain.submission.exception.LanguageMismatchException;
 import com.cocky.cockyserver.domain.submission.exception.RoundClosedException;
-import com.cocky.cockyserver.domain.submission.exception.SubmissionAccessDeniedException;
 import com.cocky.cockyserver.domain.submission.exception.SubmissionNotFoundException;
 import com.cocky.cockyserver.domain.submission.exception.TestCaseNotConfiguredException;
 import com.cocky.cockyserver.domain.submission.judge.JudgeExecutionException;
@@ -161,12 +160,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleSubmissionNotFound(SubmissionNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ErrorResponse("SUBMISSION_NOT_FOUND", e.getMessage()));
-    }
-
-    @ExceptionHandler(SubmissionAccessDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleSubmissionAccessDenied(SubmissionAccessDeniedException e) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(new ErrorResponse("SUBMISSION_ACCESS_DENIED", e.getMessage()));
     }
 
     /** language/difficulty/sort 등 @RequestParam enum 값이 유효하지 않을 때(400). */
