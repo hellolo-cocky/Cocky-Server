@@ -11,7 +11,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -35,14 +34,15 @@ public class SubmissionController {
         return ResponseEntity.ok(submissionService.submit(principal.userId(), request));
     }
 
+    /** 내 풀이 기록(최신순 고정 — 정렬은 서비스/쿼리가 정한다). */
     @GetMapping("/me")
     public ResponseEntity<Page<SubmissionSummaryResponse>> getMySubmissions(
             @AuthenticationPrincipal UserPrincipal principal,
-            @PageableDefault(size = 20, sort = "submittedAt", direction = Sort.Direction.DESC) Pageable pageable) {
+            @PageableDefault(size = 20) Pageable pageable) {
         return ResponseEntity.ok(submissionService.getMySubmissions(principal.userId(), pageable));
     }
 
-    @GetMapping("/{submissionId}")
+    @GetMapping("/me/{submissionId}")
     public ResponseEntity<SubmissionDetailResponse> getSubmission(
             @AuthenticationPrincipal UserPrincipal principal, @PathVariable Long submissionId) {
         return ResponseEntity.ok(submissionService.getSubmissionDetail(principal.userId(), submissionId));

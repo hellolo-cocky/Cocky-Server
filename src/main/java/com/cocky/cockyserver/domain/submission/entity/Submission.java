@@ -102,4 +102,16 @@ public class Submission {
         this.originalityScore = originalityScore;
         this.feedbackComment = comment;
     }
+
+    /** AI 피드백 가산점 합(time+readability+originality). 하나라도 없으면 아직 피드백이 없는 것이라 null. */
+    public BigDecimal aiScore() {
+        return sumAiScores(timeScore, readabilityScore, originalityScore);
+    }
+
+    public static BigDecimal sumAiScores(BigDecimal time, BigDecimal readability, BigDecimal originality) {
+        if (time == null || readability == null || originality == null) {
+            return null;
+        }
+        return time.add(readability).add(originality);
+    }
 }
