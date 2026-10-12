@@ -6,6 +6,7 @@ import com.cocky.cockyserver.ai.dto.Period;
 import com.cocky.cockyserver.ai.dto.PeriodFeedback;
 import com.cocky.cockyserver.ai.dto.PeriodStats;
 import com.cocky.cockyserver.ai.port.PeriodFeedbackProvider;
+import com.cocky.cockyserver.domain.feedback.FeedbackPeriod;
 import com.cocky.cockyserver.domain.feedback.dto.PeriodFeedbackResult;
 import com.cocky.cockyserver.domain.round.TopicRotationPolicy;
 import com.cocky.cockyserver.domain.round.repository.RoundRepository;
@@ -50,7 +51,7 @@ public class FeedbackService {
     private final Clock clock;
 
     /** {@link PeriodStats}를 집계해 AI 포트에 넘기고 총평을 받아온다 — 이 메서드가 조립 진입점이다. */
-    public PeriodFeedback getPeriodicFeedback(Long userId, Period period) {
+    public PeriodFeedback getPeriodicFeedback(Long userId, FeedbackPeriod period) {
         return getPeriodicFeedbackWithStats(userId, period).feedback();
     }
 
@@ -60,14 +61,14 @@ public class FeedbackService {
      * 쓴다 — {@code aggregateStats}를 따로 한 번 더 부르면 집계 쿼리 3종이 두 번 도는 걸 피하기
      * 위함이다.
      */
-    public PeriodFeedbackResult getPeriodicFeedbackWithStats(Long userId, Period period) {
+    public PeriodFeedbackResult getPeriodicFeedbackWithStats(Long userId, FeedbackPeriod period) {
         PeriodStats stats = aggregateStats(userId, period);
-        PeriodFeedback feedback = periodFeedbackProvider.summarize(period, stats);
+        PeriodFeedback feedback = periodFeedbackProvider.summarize(toAiPeriod(period), stats);
         return new PeriodFeedbackResult(stats, feedback);
     }
 
     /** {@link PeriodFeedbackProvider#summarize} 호출에 필요한 4개 필드를 DB에서 집계한다. */
-    public PeriodStats aggregateStats(Long userId, Period period) {
+    public PeriodStats aggregateStats(Long userId, FeedbackPeriod period) {
         LocalDateTime now = LocalDateTime.now(clock);
         Optional<PeriodWindow> window = resolveWindow(period, now);
         if (window.isEmpty()) {
@@ -111,7 +112,7 @@ public class FeedbackService {
      * 호출해도 그날은 아직 안 끝난 주이므로 previousOrSame이 아니라 previous를 써서 지난주로
      * 밀어낸다.
      */
-    private Optional<PeriodWindow> resolveWindow(Period period, LocalDateTime now) {
+    private Optional<PeriodWindow> resolveWindow(FeedbackPeriod period, LocalDateTime now) {
         return switch (period) {
             case ROUND -> roundRepository.findTopClosedRoundWithProblems(now)
                     .map(r -> new PeriodWindow(r.getOpenAt(), r.getCloseAt()));
@@ -140,8 +141,8 @@ public class FeedbackService {
      * {@code active=true}로 미리 만들어 두므로, 마감 여부를 안 보면 23시 이후엔 아직 시작도
      * 안 한 다음 라운드가 "최신"으로 잡혀 다음 주제가 한 주 더 밀리는 버그가 있었다.
      */
-    private String resolveNextTopic(Period period, LocalDateTime now) {
-        if (period == Period.ROUND) {
+    private String resolveNextTopic(FeedbackPeriod period, LocalDateTime now) {
+        if (period == FeedbackPeriod.ROUND) {
             return null;
         }
         return roundRepository.findTopClosedRoundWithProblems(now)
@@ -149,6 +150,19 @@ public class FeedbackService {
                 .flatMap(topicRepository::findByTopicOrder)
                 .map(Topic::getName)
                 .orElse(null);
+    }
+
+    /**
+     * FeedbackPeriod(API 값) → ai.dto.Period(AI 모듈 계약) 변환. AI 호출 직전에만 쓴다.
+     * {@link #toAiLanguage}와 같은 이유로 switch 명시 매핑 — 어느 한쪽에 값이 추가되면(default 없음)
+     * 여기서 컴파일 에러로 드러나고, 매핑 누락은 {@code FeedbackPeriodMappingTest}가 잡는다.
+     */
+    static Period toAiPeriod(FeedbackPeriod period) {
+        return switch (period) {
+            case ROUND -> Period.ROUND;
+            case WEEKLY -> Period.WEEKLY;
+            case MONTHLY -> Period.MONTHLY;
+        };
     }
 
     /**

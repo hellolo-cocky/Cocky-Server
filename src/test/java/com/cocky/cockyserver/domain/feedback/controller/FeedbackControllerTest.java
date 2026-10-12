@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.cocky.cockyserver.ai.dto.Difficulty;
 import com.cocky.cockyserver.ai.dto.Language;
 import com.cocky.cockyserver.ai.dto.Period;
+import com.cocky.cockyserver.domain.feedback.FeedbackPeriod;
 import com.cocky.cockyserver.ai.dto.PeriodFeedback;
 import com.cocky.cockyserver.ai.dto.PeriodStats;
 import com.cocky.cockyserver.ai.port.PeriodFeedbackFailedException;
@@ -65,7 +66,7 @@ class FeedbackControllerTest {
                 Map.of("WA", 2, "TLE", 1),
                 null);
         PeriodFeedback feedback = new PeriodFeedback(Period.ROUND, "이번 회차 총평", null);
-        when(feedbackService.getPeriodicFeedbackWithStats(eq(USER_ID), eq(Period.ROUND)))
+        when(feedbackService.getPeriodicFeedbackWithStats(eq(USER_ID), eq(FeedbackPeriod.ROUND)))
                 .thenReturn(new PeriodFeedbackResult(stats, feedback));
 
         mockMvc.perform(get("/api/v1/feedback/periodic").param("period", "ROUND"))
@@ -88,7 +89,7 @@ class FeedbackControllerTest {
         PeriodStats stats = stats(Map.of(Language.PYTHON, 5), Map.of(Difficulty.NORMAL, 5),
                 Map.of("WA", 1), "4주차_주제");
         PeriodFeedback feedback = new PeriodFeedback(Period.WEEKLY, "이번 주 총평", "4주차_주제 예습 추천");
-        when(feedbackService.getPeriodicFeedbackWithStats(eq(USER_ID), eq(Period.WEEKLY)))
+        when(feedbackService.getPeriodicFeedbackWithStats(eq(USER_ID), eq(FeedbackPeriod.WEEKLY)))
                 .thenReturn(new PeriodFeedbackResult(stats, feedback));
 
         mockMvc.perform(get("/api/v1/feedback/periodic").param("period", "WEEKLY"))
@@ -103,7 +104,7 @@ class FeedbackControllerTest {
         PeriodStats stats = stats(Map.of(Language.JAVA, 10), Map.of(Difficulty.HARD, 10),
                 Map.of("RE", 3), "5주차_주제");
         PeriodFeedback feedback = new PeriodFeedback(Period.MONTHLY, "이번 달 총평", "5주차_주제 예습 추천");
-        when(feedbackService.getPeriodicFeedbackWithStats(eq(USER_ID), eq(Period.MONTHLY)))
+        when(feedbackService.getPeriodicFeedbackWithStats(eq(USER_ID), eq(FeedbackPeriod.MONTHLY)))
                 .thenReturn(new PeriodFeedbackResult(stats, feedback));
 
         mockMvc.perform(get("/api/v1/feedback/periodic").param("period", "MONTHLY"))
@@ -117,7 +118,7 @@ class FeedbackControllerTest {
     void 집계_결과가_비어있으면_세_stats_필드_모두_빈_객체로_내려온다() throws Exception {
         PeriodStats emptyStats = stats(Map.of(), Map.of(), Map.of(), null);
         PeriodFeedback feedback = new PeriodFeedback(Period.ROUND, "제출 이력 없음", null);
-        when(feedbackService.getPeriodicFeedbackWithStats(eq(USER_ID), eq(Period.ROUND)))
+        when(feedbackService.getPeriodicFeedbackWithStats(eq(USER_ID), eq(FeedbackPeriod.ROUND)))
                 .thenReturn(new PeriodFeedbackResult(emptyStats, feedback));
 
         mockMvc.perform(get("/api/v1/feedback/periodic").param("period", "ROUND"))
@@ -145,7 +146,7 @@ class FeedbackControllerTest {
     // PeriodFeedbackFailedException으로 올라오면 500 스택트레이스 대신 503으로 응답해야 한다.
     @Test
     void 기간_피드백_생성에_실패하면_503_PERIOD_FEEDBACK_FAILED가_내려온다() throws Exception {
-        when(feedbackService.getPeriodicFeedbackWithStats(eq(USER_ID), eq(Period.ROUND)))
+        when(feedbackService.getPeriodicFeedbackWithStats(eq(USER_ID), eq(FeedbackPeriod.ROUND)))
                 .thenThrow(new PeriodFeedbackFailedException(
                         "기간 피드백 생성 실패: OpenAI 호출 실패", new RuntimeException("타임아웃")));
 
