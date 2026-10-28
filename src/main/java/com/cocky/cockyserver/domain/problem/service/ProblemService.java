@@ -42,8 +42,9 @@ public class ProblemService {
 
     @Transactional(readOnly = true)
     public ProblemDetailResponse getProblemDetail(Long problemId) {
+        // 공개 전 회차 문제도 존재하지 않는 문제와 같은 404(같은 메시지)로 응답해 존재 여부를 노출하지 않는다.
         Problem problem = problemRepository
-                .findById(problemId)
+                .findOpenById(problemId, LocalDateTime.now(clock))
                 .orElseThrow(() -> new ProblemNotFoundException("존재하지 않는 문제입니다. problemId=" + problemId));
         return ProblemDetailResponse.from(problem);
     }

@@ -5,6 +5,7 @@ import com.cocky.cockyserver.domain.problem.entity.Language;
 import com.cocky.cockyserver.domain.problem.entity.Problem;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -20,6 +21,13 @@ public interface ProblemRepository extends JpaRepository<Problem, Long> {
 
     /** 최근 문제 지문을 스케줄러가 pastStatements(중복 검사용)로 쓴다. */
     List<Problem> findTop20ByOrderByCreatedAtDesc();
+
+    /**
+     * 공개된(openAt이 지난) 회차의 문제 단건 조회 — 목록 쿼리와 같은 공개 기준.
+     * 공개 전 문제는 존재하지 않는 문제와 구분되지 않도록 빈 결과로 돌려준다.
+     */
+    @Query("select p from Problem p where p.id = :id and p.round.openAt <= :now")
+    Optional<Problem> findOpenById(@Param("id") Long id, @Param("now") LocalDateTime now);
 
     /** 공개된(openAt이 지난) 회차의 문제만 최신순으로 조회 — LATEST/POPULAR(폴백) 정렬용. */
     @Query("select p from Problem p where p.round.openAt <= :now "

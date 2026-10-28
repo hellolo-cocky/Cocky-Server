@@ -56,6 +56,17 @@ class ProblemRepositoryTest {
     }
 
     @Test
+    void findOpenById는_공개_전_회차의_문제를_반환하지_않는다() {
+        Round openRound = persistRound(NOW.minusDays(1), NOW.plusDays(1));
+        Round futureRound = persistRound(NOW.plusDays(1), NOW.plusDays(2));
+        Problem open = persistProblem(openRound, "공개된 문제", Language.PYTHON, Difficulty.EASY);
+        Problem future = persistProblem(futureRound, "미공개 문제", Language.PYTHON, Difficulty.EASY);
+
+        assertThat(problemRepository.findOpenById(open.getId(), NOW)).isPresent();
+        assertThat(problemRepository.findOpenById(future.getId(), NOW)).isEmpty();
+    }
+
+    @Test
     void filtersByLanguageAndDifficulty() {
         Round round = persistRound(NOW.minusDays(1), NOW.plusDays(1));
         persistProblem(round, "파이썬 쉬움", Language.PYTHON, Difficulty.EASY);
