@@ -74,6 +74,17 @@ class SubmissionControllerTest {
     }
 
     @Test
+    void 본문이_깨진_JSON이면_400_INVALID_REQUEST로_통일된다() throws Exception {
+        mockMvc.perform(post("/api/v1/submissions")
+                        .header(HttpHeaders.AUTHORIZATION, bearer)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"problemId\":1,"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.message").value("요청 본문 형식이 올바르지 않습니다."));
+    }
+
+    @Test
     void 토큰이_없으면_401이다() throws Exception {
         mockMvc.perform(post("/api/v1/submissions")
                         .contentType(MediaType.APPLICATION_JSON)

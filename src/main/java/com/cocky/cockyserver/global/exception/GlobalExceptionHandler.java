@@ -23,6 +23,7 @@ import com.cocky.cockyserver.global.security.AuthErrorCode;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -175,6 +176,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleMissingParameter(MissingServletRequestParameterException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse("INVALID_REQUEST", "필수 파라미터 '%s'가 없습니다.".formatted(e.getParameterName())));
+    }
+
+    /** JSON 문법 오류·enum 값 오류·본문 누락 등 요청 본문을 읽지 못한 경우(400) — Spring 기본 응답 대신 {code, message}로 통일. */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleNotReadable(HttpMessageNotReadableException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse("INVALID_REQUEST", "요청 본문 형식이 올바르지 않습니다."));
     }
 
     @ExceptionHandler(TopicNotFoundException.class)

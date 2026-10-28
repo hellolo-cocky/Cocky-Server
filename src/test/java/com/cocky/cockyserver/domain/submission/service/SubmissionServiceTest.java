@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -106,16 +107,26 @@ class SubmissionServiceTest {
 
     @Test
     void problemNotFound_throws404() {
-        when(problemRepository.findById(PROBLEM_ID)).thenReturn(Optional.empty());
+        when(problemRepository.findOpenById(PROBLEM_ID, NOW)).thenReturn(Optional.empty());
 
         assertThrows(ProblemNotFoundException.class,
                 () -> submissionService.submit(USER_ID, request(Language.PYTHON)));
     }
 
     @Test
+    void 공개_전_문제에_제출하면_404이고_채점하지_않는다() {
+        // 공개 전 회차 문제는 findOpenById가 빈 결과를 돌려주므로 존재하지 않는 문제와 같은 경로로 막힌다.
+        when(problemRepository.findOpenById(PROBLEM_ID, NOW)).thenReturn(Optional.empty());
+
+        assertThrows(ProblemNotFoundException.class,
+                () -> submissionService.submit(USER_ID, request(Language.PYTHON)));
+        verify(judgeService, never()).judge(any());
+    }
+
+    @Test
     void languageMismatch_throws400() {
         Problem problem = problem(activeRound(), Language.JAVA, Difficulty.NORMAL);
-        when(problemRepository.findById(PROBLEM_ID)).thenReturn(Optional.of(problem));
+        when(problemRepository.findOpenById(PROBLEM_ID, NOW)).thenReturn(Optional.of(problem));
 
         assertThrows(LanguageMismatchException.class,
                 () -> submissionService.submit(USER_ID, request(Language.PYTHON)));
@@ -126,7 +137,7 @@ class SubmissionServiceTest {
         Round round = new Round(new Topic("배열", 1),
                 LocalDate.of(2026, 7, 8), LocalDateTime.of(2026, 7, 8, 0, 0), LocalDateTime.of(2026, 7, 9, 0, 0));
         Problem problem = problem(round, Language.PYTHON, Difficulty.NORMAL);
-        when(problemRepository.findById(PROBLEM_ID)).thenReturn(Optional.of(problem));
+        when(problemRepository.findOpenById(PROBLEM_ID, NOW)).thenReturn(Optional.of(problem));
 
         assertThrows(RoundClosedException.class,
                 () -> submissionService.submit(USER_ID, request(Language.PYTHON)));
@@ -138,7 +149,7 @@ class SubmissionServiceTest {
                 LocalDate.of(2026, 7, 6), LocalDateTime.of(2026, 7, 6, 0, 0), LocalDateTime.of(2026, 7, 7, 0, 0));
         round.activate();
         Problem problem = problem(round, Language.PYTHON, Difficulty.NORMAL);
-        when(problemRepository.findById(PROBLEM_ID)).thenReturn(Optional.of(problem));
+        when(problemRepository.findOpenById(PROBLEM_ID, NOW)).thenReturn(Optional.of(problem));
 
         assertThrows(RoundClosedException.class,
                 () -> submissionService.submit(USER_ID, request(Language.PYTHON)));
@@ -148,7 +159,7 @@ class SubmissionServiceTest {
     void acVerdictAwardsDifficultyBaseScoreAndRotatesLatest() {
         Problem problem = problem(activeRound(), Language.PYTHON, Difficulty.HARD);
         User user = new User(100L, "student@gsm.hs.kr", "홍길동", 2, 3, 15, "SW과", Role.STUDENT);
-        when(problemRepository.findById(PROBLEM_ID)).thenReturn(Optional.of(problem));
+        when(problemRepository.findOpenById(PROBLEM_ID, NOW)).thenReturn(Optional.of(problem));
         when(problemRepository.getReferenceById(any())).thenReturn(problem);
         when(testCaseRepository.findByProblemIdOrderByIdAsc(any()))
                 .thenReturn(List.of(new TestCase(problem, "1", "1", true)));
@@ -169,7 +180,7 @@ class SubmissionServiceTest {
     void nonAcVerdictScoresZero() {
         Problem problem = problem(activeRound(), Language.PYTHON, Difficulty.HARD);
         User user = new User(100L, "student@gsm.hs.kr", "홍길동", 2, 3, 15, "SW과", Role.STUDENT);
-        when(problemRepository.findById(PROBLEM_ID)).thenReturn(Optional.of(problem));
+        when(problemRepository.findOpenById(PROBLEM_ID, NOW)).thenReturn(Optional.of(problem));
         when(problemRepository.getReferenceById(any())).thenReturn(problem);
         when(testCaseRepository.findByProblemIdOrderByIdAsc(any()))
                 .thenReturn(List.of(new TestCase(problem, "1", "1", true), new TestCase(problem, "2", "2", false)));
@@ -188,7 +199,7 @@ class SubmissionServiceTest {
     @Test
     void noTestCasesThrowsTestCaseNotConfigured() {
         Problem problem = problem(activeRound(), Language.PYTHON, Difficulty.HARD);
-        when(problemRepository.findById(PROBLEM_ID)).thenReturn(Optional.of(problem));
+        when(problemRepository.findOpenById(PROBLEM_ID, NOW)).thenReturn(Optional.of(problem));
         when(testCaseRepository.findByProblemIdOrderByIdAsc(any())).thenReturn(List.of());
 
         assertThrows(TestCaseNotConfiguredException.class,
@@ -215,7 +226,7 @@ class SubmissionServiceTest {
     @Test
     void code가_정확히_64KB면_크기_검사를_통과한다() {
         // 크기 검사를 통과하면 다음 단계(문제 조회)로 넘어가므로 ProblemNotFound가 나야 한다.
-        when(problemRepository.findById(PROBLEM_ID)).thenReturn(Optional.empty());
+        when(problemRepository.findOpenById(PROBLEM_ID, NOW)).thenReturn(Optional.empty());
         SubmissionRequest exact = new SubmissionRequest(PROBLEM_ID, Language.PYTHON, "a".repeat(64 * 1024), false);
 
         assertThrows(ProblemNotFoundException.class, () -> submissionService.submit(USER_ID, exact));
@@ -227,7 +238,7 @@ class SubmissionServiceTest {
         Problem problem = problem(activeRound(), Language.PYTHON, Difficulty.HARD);
         User user = new User(100L, "student@gsm.hs.kr", "홍길동", 2, 3, 15, "SW과", Role.STUDENT);
         user.updateAnonymousDefault(true);
-        when(problemRepository.findById(PROBLEM_ID)).thenReturn(Optional.of(problem));
+        when(problemRepository.findOpenById(PROBLEM_ID, NOW)).thenReturn(Optional.of(problem));
         when(problemRepository.getReferenceById(any())).thenReturn(problem);
         when(testCaseRepository.findByProblemIdOrderByIdAsc(any()))
                 .thenReturn(List.of(new TestCase(problem, "1", "1", true)));
@@ -247,7 +258,7 @@ class SubmissionServiceTest {
         Problem problem = problem(activeRound(), Language.PYTHON, Difficulty.HARD);
         User user = new User(100L, "student@gsm.hs.kr", "홍길동", 2, 3, 15, "SW과", Role.STUDENT);
         // 사용자 기본값은 false지만 요청이 true를 명시 — 요청 값이 이겨야 한다.
-        when(problemRepository.findById(PROBLEM_ID)).thenReturn(Optional.of(problem));
+        when(problemRepository.findOpenById(PROBLEM_ID, NOW)).thenReturn(Optional.of(problem));
         when(problemRepository.getReferenceById(any())).thenReturn(problem);
         when(testCaseRepository.findByProblemIdOrderByIdAsc(any()))
                 .thenReturn(List.of(new TestCase(problem, "1", "1", true)));
@@ -267,7 +278,7 @@ class SubmissionServiceTest {
         Problem problem = problem(activeRound(), Language.PYTHON, Difficulty.HARD);
         User user = new User(100L, "student@gsm.hs.kr", "홍길동", 2, 3, 15, "SW과", Role.STUDENT);
         user.updateAnonymousDefault(true);
-        when(problemRepository.findById(PROBLEM_ID)).thenReturn(Optional.of(problem));
+        when(problemRepository.findOpenById(PROBLEM_ID, NOW)).thenReturn(Optional.of(problem));
         when(problemRepository.getReferenceById(any())).thenReturn(problem);
         when(testCaseRepository.findByProblemIdOrderByIdAsc(any()))
                 .thenReturn(List.of(new TestCase(problem, "1", "1", true)));

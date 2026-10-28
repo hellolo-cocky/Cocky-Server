@@ -119,7 +119,8 @@ public class SubmissionService {
 
     /** 문제 조회·검증(404/400/403)과 테스트케이스 로딩까지만 담당 — 짧은 읽기 트랜잭션. */
     private Validated validate(SubmissionRequest request) {
-        Problem problem = problemRepository.findById(request.problemId())
+        // 공개 전 회차 문제는 존재하지 않는 문제와 같은 404로 막는다(상세 조회와 동일 기준).
+        Problem problem = problemRepository.findOpenById(request.problemId(), LocalDateTime.now(clock))
                 .orElseThrow(() -> new ProblemNotFoundException(
                         "존재하지 않는 문제입니다. problemId=" + request.problemId()));
 

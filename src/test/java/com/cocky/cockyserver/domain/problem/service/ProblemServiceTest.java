@@ -1,6 +1,7 @@
 package com.cocky.cockyserver.domain.problem.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -16,6 +17,7 @@ import com.cocky.cockyserver.domain.problem.dto.RoundProblemsResponse;
 import com.cocky.cockyserver.domain.problem.entity.Difficulty;
 import com.cocky.cockyserver.domain.problem.entity.Language;
 import com.cocky.cockyserver.domain.problem.entity.Problem;
+import com.cocky.cockyserver.domain.problem.exception.ProblemNotFoundException;
 import com.cocky.cockyserver.domain.problem.repository.ProblemRepository;
 import com.cocky.cockyserver.domain.round.entity.Round;
 import com.cocky.cockyserver.domain.round.service.RoundService;
@@ -73,11 +75,19 @@ class ProblemServiceTest {
     void problemDetailIncludesDifficulty() {
         ProblemService service = new ProblemService(problemRepository, roundService, clock);
         Problem problem = problem(round());
-        when(problemRepository.findById(anyLong())).thenReturn(Optional.of(problem));
+        when(problemRepository.findOpenById(anyLong(), eq(NOW))).thenReturn(Optional.of(problem));
 
         ProblemDetailResponse response = service.getProblemDetail(1L);
 
         assertEquals(Difficulty.HARD, response.difficulty());
+    }
+
+    @Test
+    void 공개_전_문제_상세_조회시_404() {
+        ProblemService service = new ProblemService(problemRepository, roundService, clock);
+        when(problemRepository.findOpenById(1L, NOW)).thenReturn(Optional.empty());
+
+        assertThrows(ProblemNotFoundException.class, () -> service.getProblemDetail(1L));
     }
 
     @Test
