@@ -31,7 +31,10 @@ public class SecurityConfig {
     private static final String[] PERMIT_ALL_PATHS = {
             "/api/v1/health",
             "/api/v1/auth/signin",
-            "/api/v1/auth/reissue"
+            "/api/v1/auth/reissue",
+            "/swagger-ui/**",
+            "/swagger-ui.html",
+            "/v3/api-docs/**"
     };
 
     private final JwtProvider jwtProvider;
